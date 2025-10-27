@@ -1,6 +1,122 @@
 {
   "cases": [
     {
+      "name": "LC1_2_10_LC1_2_4",
+      "steps": [
+        "step_0.json",
+        "step_1.json",
+        "step_2.json",
+        "step_3.json",
+        "step_4.json"
+      ]
+    },
+    {
+      "name": "LC1_2_2_LC1_2_6",
+      "steps": [
+        "step_0.json",
+        "step_1.json",
+        "step_2.json",
+        "step_3.json"
+      ]
+    },
+    {
+      "name": "LC1_2_2_LC1_2_7",
+      "steps": [
+        "step_0.json",
+        "step_1.json",
+        "step_2.json",
+        "step_3.json"
+      ]
+    },
+    {
+      "name": "LC1_2_4_LC1_2_7",
+      "steps": [
+        "step_0.json",
+        "step_1.json",
+        "step_2.json",
+        "step_3.json",
+        "step_4.json"
+      ]
+    },
+    {
+      "name": "LC1_2_4_LC1_2_8",
+      "steps": [
+        "step_0.json",
+        "step_1.json",
+        "step_2.json",
+        "step_3.json",
+        "step_4.json",
+        "step_5.json",
+        "step_6.json"
+      ]
+    },
+    {
+      "name": "LR1_2_10_LR1_2_3",
+      "steps": [
+        "step_0.json",
+        "step_1.json",
+        "step_2.json",
+        "step_3.json",
+        "step_4.json",
+        "step_5.json"
+      ]
+    },
+    {
+      "name": "LR1_2_10_LR1_2_8",
+      "steps": [
+        "step_0.json",
+        "step_1.json",
+        "step_10.json",
+        "step_2.json",
+        "step_3.json",
+        "step_4.json",
+        "step_5.json",
+        "step_6.json",
+        "step_7.json",
+        "step_8.json",
+        "step_9.json"
+      ]
+    },
+    {
+      "name": "LR1_2_3_LR1_2_8",
+      "steps": [
+        "step_0.json",
+        "step_1.json",
+        "step_2.json",
+        "step_3.json",
+        "step_4.json",
+        "step_5.json",
+        "step_6.json",
+        "step_7.json"
+      ]
+    },
+    {
+      "name": "LR1_2_5_LR1_2_8",
+      "steps": [
+        "step_0.json",
+        "step_1.json",
+        "step_2.json",
+        "step_3.json",
+        "step_4.json",
+        "step_5.json",
+        "step_6.json",
+        "step_7.json"
+      ]
+    },
+    {
+      "name": "LR1_2_8_LR1_2_9",
+      "steps": [
+        "step_0.json",
+        "step_1.json",
+        "step_2.json",
+        "step_3.json",
+        "step_4.json",
+        "step_5.json",
+        "step_6.json",
+        "step_7.json"
+      ]
+    },
+    {
       "name": "case_1",
       "steps": [
         "step_0.json",

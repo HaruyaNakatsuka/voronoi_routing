@@ -10,7 +10,7 @@ import os
 # ==============================
 # === テストケースの定義部 ===
 # ==============================
-"""
+
 test_cases = [
     (["data/LC1_2_2.txt", "data/LC1_2_6.txt"], [(0, 0), (42, -42)]),
     (["data/LC1_2_2.txt", "data/LC1_2_7.txt"], [(0, 0), (-32, -32)]),
@@ -23,12 +23,7 @@ test_cases = [
     (["data/LR1_2_10.txt", "data/LR1_2_3.txt"], [(0, 0), (0, -30)]),
     (["data/LR1_2_10.txt", "data/LR1_2_8.txt"], [(0, 0), (0, 30)])
 ]
-"""
 
-test_cases = [
-    (["data/LR1_2_10.txt", "data/LR1_2_8.txt"], [(0, 0), (0, 30)]),
-    (["data/LR1_2_10.txt", "data/test1.txt"], [(0, 0), (0, 30)])
-]
 
 # ==============================
 # === テストケースの実行部 ===
@@ -81,8 +76,9 @@ for case_index, (file_paths, offsets) in enumerate(test_cases, 1):
         all_customers, all_PD_pairs, num_lsps, vehicle_num_list, depot_id_list, vehicle_capacity=vehicle_capacity
     )
     plot_routes(all_customers, routes, depot_id_list, vehicle_num_list, iteration=0, instance_name=instance_name)
-    export_vrp_state(all_customers, routes, all_PD_pairs, 0, case_index,
-                 depot_id_list=depot_id_list, vehicle_num_list=vehicle_num_list)
+    export_vrp_state(all_customers, routes, all_PD_pairs, 0, case_index=case_index,
+                     depot_id_list=depot_id_list, vehicle_num_list=vehicle_num_list,
+                     instance_name=instance_name, output_root="web_data")
     
     initial_cost = sum(route_cost(route, all_customers) for route in routes)
     print(f"初期経路コスト＝{initial_cost}")
@@ -134,8 +130,9 @@ for case_index, (file_paths, offsets) in enumerate(test_cases, 1):
             routes, all_customers, all_PD_pairs, vehicle_capacity, vehicle_num_list
         )
         plot_routes(all_customers, routes, depot_id_list, vehicle_num_list, iteration=i, instance_name=instance_name)
-        export_vrp_state(all_customers, routes, all_PD_pairs, i, case_index,
-                 depot_id_list=depot_id_list, vehicle_num_list=vehicle_num_list)
+        export_vrp_state(all_customers, routes, all_PD_pairs, i, case_index=case_index,
+                         depot_id_list=depot_id_list, vehicle_num_list=vehicle_num_list,
+                         instance_name=instance_name, output_root="web_data")
         #print_routes_with_lsp_separator(routes, vehicle_num_list)
         
                 # === 各LSPごとのコスト計算 ===
@@ -164,9 +161,10 @@ for case_index, (file_paths, offsets) in enumerate(test_cases, 1):
             previous_cost = current_cost
             i=i+1
 
+    generate_index_json(output_root="web_data", target_root="vrp-viewer/public/vrp_data")
+
     # 経路改善終了, 実行時間表示
     end_time = time.time()
     elapsed = end_time - start_time
     print(f"=== テストケース {case_index} の実行時間: {elapsed:.2f} 秒 ===")
     
-generate_index_json()
