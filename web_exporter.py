@@ -26,7 +26,14 @@ def export_vrp_state(customers, routes, PD_pairs, step_index, case_index=None,
             folder_name = f"case_{case_index}"
 
     output_dir = os.path.join(output_root, folder_name)
-    os.makedirs(output_dir, exist_ok=True)
+    # --- 初回のみフォルダをクリーンにする ---
+    if step_index == 0:
+        if os.path.exists(output_dir):
+            print(f"⚠️ 初回ステップのため既存フォルダを削除します: {output_dir}")
+            shutil.rmtree(output_dir)
+        os.makedirs(output_dir, exist_ok=True)
+    else:
+        os.makedirs(output_dir, exist_ok=True)
 
     if depot_id_list is None:
         depot_id_list = [c["id"] for c in customers if c.get("demand", 0) == 0]
@@ -64,22 +71,27 @@ def generate_index_json(output_root="web_data", target_root="vrp-viewer/public/v
     os.makedirs(target_root, exist_ok=True)
     cases = []
 
-    # web_data 内の instance フォルダを列挙 (web_data/*)
     for case_dir in sorted(glob.glob(os.path.join(output_root, "*"))):
         if not os.path.isdir(case_dir):
             continue
+
         case_name = os.path.basename(case_dir)
-        # collect JSON steps (ソートして step_0.. の順に)
         steps = sorted([f for f in os.listdir(case_dir) if f.endswith(".json")])
         cases.append({"name": case_name, "steps": steps})
 
-        # コピー先フォルダ（target_root/case_name）
         dest_case_dir = os.path.join(target_root, case_name)
-        # copytree with dirs_exist_ok overwrites files if already present
-        shutil.copytree(case_dir, dest_case_dir, dirs_exist_ok=True)
+        if os.path.exists(dest_case_dir):
+            print(f"⚠️ 既存フォルダを削除します: {dest_case_dir}")
+            shutil.rmtree(dest_case_dir)
 
-    # index.json（React が期待する形式）を書き出す
+        shutil.copytree(case_dir, dest_case_dir)
+        print(f"📁 コピー完了: {case_dir} → {dest_case_dir}")
+
     index_path = os.path.join(target_root, "index.json")
+    if os.path.exists(index_path):
+        print(f"⚠️ 既存の index.json を削除します: {index_path}")
+        os.remove(index_path)
+
     with open(index_path, "w", encoding="utf-8") as f:
         json.dump({"cases": cases}, f, indent=2, ensure_ascii=False)
 

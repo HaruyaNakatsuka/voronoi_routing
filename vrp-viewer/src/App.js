@@ -1,35 +1,53 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import InteractiveVRPViewer from "./InteractiveVRPViewer";
 
 export default function App() {
-  const [caseList, setCaseList] = useState([]);        // 正規化後: [{name, steps}, ...]
+  const [caseList, setCaseList] = useState([]);        // [{name, steps}, ...]
   const [selectedCase, setSelectedCase] = useState(null);
-  const [stepList, setStepList] = useState([]);        // 正規化後: ["step_0.json", ...]
+  const [stepList, setStepList] = useState([]);        // ["step_0.json", ...]
   const [selectedStep, setSelectedStep] = useState(null);
   const [data, setData] = useState(null);
 
-  // ユーティリティ: 入力JSONを正規化して {name, steps} の配列にする
+  // ノード選択（FastVRPViewer から受け取る）
+  const [selectedNode, setSelectedNode] = useState(null);
+
+  // ビューア領域のサイズ計測
+  const viewerRef = useRef(null);
+  const [viewerSize, setViewerSize] = useState({ width: 0, height: 0 });
+  useEffect(() => {
+    const measure = () => {
+      if (!viewerRef.current) return;
+      setViewerSize({
+        width: viewerRef.current.clientWidth,
+        height: viewerRef.current.clientHeight,
+      });
+    };
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, []);
+
+  // index.json 正規化
   const normalizeIndexJson = (json) => {
-    // 1) 既に { cases: [...] } 形式で来た場合
     if (json && Array.isArray(json.cases)) {
-      return json.cases.map((c) => {
-        if (typeof c === "string") return { name: c, steps: [] };
-        if (typeof c === "object" && c.name) return { name: c.name, steps: c.steps || [] };
-        return null;
-      }).filter(Boolean);
+      return json.cases
+        .map((c) => {
+          if (typeof c === "string") return { name: c, steps: [] };
+          if (typeof c === "object" && c.name) return { name: c.name, steps: c.steps || [] };
+          return null;
+        })
+        .filter(Boolean);
     }
-    // 2) 単純な配列 ["case_1.json", ...] が来た場合
     if (Array.isArray(json)) {
       return json.map((fname) => {
         const base = fname.replace(/\.json$/, "");
         return { name: base, steps: [] };
       });
     }
-    // 3) それ以外は空
     return [];
   };
 
-  // 初回：index.json を取得して正規化
+  // 初回: cases 取得
   useEffect(() => {
     fetch(process.env.PUBLIC_URL + "/vrp_data/index.json")
       .then((res) => {
@@ -41,7 +59,6 @@ export default function App() {
         setCaseList(cases);
         if (cases.length > 0) {
           setSelectedCase(cases[0].name);
-          // もし steps が既に含まれていればそれを設定
           if (cases[0].steps && cases[0].steps.length > 0) {
             setStepList(cases[0].steps);
             setSelectedStep(cases[0].steps[0]);
@@ -54,29 +71,25 @@ export default function App() {
       });
   }, []);
 
-  // selectedCase が変わったら、その case の step index を読む（case_x/index.json 形式を期待）
+  // Case 切替時: steps 取得
   useEffect(() => {
     if (!selectedCase) return;
-    // まずは caseList の中に steps があれば利用
     const caseObj = caseList.find((c) => c.name === selectedCase);
     if (caseObj && caseObj.steps && caseObj.steps.length > 0) {
       setStepList(caseObj.steps);
       setSelectedStep(caseObj.steps[0]);
       return;
     }
-    // ないなら case フォルダ内の index.json をフェッチして取得
     fetch(process.env.PUBLIC_URL + `/vrp_data/${selectedCase}/index.json`)
       .then((res) => {
         if (!res.ok) throw new Error(`Case index not found: ${res.status}`);
         return res.json();
       })
       .then((json) => {
-        // json.steps を期待
         if (Array.isArray(json.steps)) {
           setStepList(json.steps);
           setSelectedStep(json.steps[0] || null);
         } else if (Array.isArray(json)) {
-          // もし単純配列が返ってきたらそのまま使う
           setStepList(json);
           setSelectedStep(json[0] || null);
         } else {
@@ -91,7 +104,7 @@ export default function App() {
       });
   }, [selectedCase, caseList]);
 
-  // selectedCase と selectedStep が揃ったら実データを読み込む
+  // データ読み込み
   useEffect(() => {
     if (!selectedCase || !selectedStep) return;
     fetch(process.env.PUBLIC_URL + `/vrp_data/${selectedCase}/${selectedStep}`)
@@ -106,39 +119,112 @@ export default function App() {
       });
   }, [selectedCase, selectedStep]);
 
-  return (
-    <div style={{ padding: 16 }}>
-      <h1>VRP Route Viewer</h1>
+  // --- ノード情報を横並びのチップで表示する部品 ---
+  const NodeInfoChips = ({ info }) => {
+    // 1行固定・横スクロールで押し下げを防止
+    const wrapStyle = {
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      height: 56,                  // ヘッダーの固定高さ
+      overflowX: "auto",           // はみ出たら横スクロール
+      overflowY: "hidden",
+      whiteSpace: "nowrap",        // 折り返さない
+    };
+    const chipStyle = {
+      display: "inline-flex",
+      alignItems: "center",
+      gap: 6,
+      padding: "6px 10px",
+      border: "1px solid #ddd",
+      borderRadius: 999,
+      background: "#fff",
+      fontSize: 13,
+      maxWidth: 260,               // 1チップの最大幅（長いテキストに備え）
+      textOverflow: "ellipsis",
+      overflow: "hidden",
+    };
+    const labelStyle = { opacity: 0.6 };
 
+    if (!info) {
+      return (
+        <div style={wrapStyle}>
+          <span style={{ color: "#666" }}>ノードをクリックしてください。</span>
+        </div>
+      );
+    }
+    return (
+      <div style={wrapStyle} title={`Node ${info.id}`}>
+        <span style={chipStyle}><span style={labelStyle}>ID</span> {info.id}</span>
+        <span style={chipStyle}>
+          <span style={labelStyle}>座標</span> ({info.x.toFixed(1)}, {info.y.toFixed(1)})
+        </span>
+        <span style={chipStyle}><span style={labelStyle}>種類</span> {info.kind}</span>
+        {info.partnerId && (
+          <>
+            <span style={chipStyle}><span style={labelStyle}>対応ID</span> {info.partnerId}</span>
+            {info.partnerCoord && (
+              <span style={chipStyle}>
+                <span style={labelStyle}>対応座標</span> (
+                {info.partnerCoord.x.toFixed(1)}, {info.partnerCoord.y.toFixed(1)})
+              </span>
+            )}
+          </>
+        )}
+      </div>
+    );
+  };
+
+  return (
+    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", padding: 16 }}>
+      {/* ヘッダー：左タイトル／右ノード情報（1行固定） */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 16,
+          flexWrap: "nowrap",     // 1行固定で折り返さない
+        }}
+      >
+        <h1 style={{ margin: 0, lineHeight: "56px" }}>VRP Route Viewer</h1>
+
+        {/* 右側：ノード情報（横並びチップ／横スクロール） */}
+        <div
+          style={{
+            minWidth: 360,
+            maxWidth: "50vw",           // タイトルとバランスよく
+            border: "1px solid #ccc",
+            borderRadius: 10,
+            background: "#f9f9f9",
+            padding: "4px 8px",
+            height: 56,                 // ヘッダー高さに合わせる（押し下げ防止）
+            boxSizing: "border-box",
+          }}
+        >
+          <NodeInfoChips info={selectedNode} />
+        </div>
+      </div>
+
+      {/* セレクタ行 */}
       <div style={{ margin: "12px 0" }}>
         <label style={{ marginRight: 8 }}>Case:</label>
-        <select
-          value={selectedCase || ""}
-          onChange={(e) => setSelectedCase(e.target.value)}
-        >
-          {/* caseList の要素は {name, steps} というオブジェクトに統一済み */}
+        <select value={selectedCase || ""} onChange={(e) => setSelectedCase(e.target.value)}>
           {caseList.map((c, idx) => (
-            // key はユニークな文字列（name がユニークである前提、無ければ idx 併用）
-            <option key={`${c.name}-${idx}`} value={c.name}>
-              {c.name}
-            </option>
+            <option key={`${c.name}-${idx}`} value={c.name}>{c.name}</option>
           ))}
         </select>
 
         <label style={{ marginLeft: 16, marginRight: 8 }}>Step:</label>
-        <select
-          value={selectedStep || ""}
-          onChange={(e) => setSelectedStep(e.target.value)}
-        >
+        <select value={selectedStep || ""} onChange={(e) => setSelectedStep(e.target.value)}>
           {stepList.map((s, idx) => (
-            <option key={`${s}-${idx}`} value={s}>
-              {s}
-            </option>
+            <option key={`${s}-${idx}`} value={s}>{s}</option>
           ))}
         </select>
       </div>
 
-      <div>
+      {/* ビューア領域：残り高さすべて */}
+      <div ref={viewerRef} style={{ flex: 1, minHeight: 0 }}>
         {data ? (
           <InteractiveVRPViewer
             customers={data.customers}
@@ -146,6 +232,9 @@ export default function App() {
             PD_pairs={data.PD_pairs}
             depot_id_list={data.depot_id_list}
             vehicle_num_list={data.vehicle_num_list}
+            width={viewerSize.width}
+            height={viewerSize.height}
+            onSelectNode={setSelectedNode}
           />
         ) : (
           <div>データを読み込み中、またはデータが見つかりません。</div>
