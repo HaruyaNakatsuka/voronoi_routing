@@ -75,5 +75,5 @@ def plot_routes(customers, routes, depot_id_list, vehicle_num_list, iteration, i
     save_path = os.path.join(instance_folder, f"routes_iter_{iteration:02d}.png")
     plt.savefig(save_path)
     plt.close()
-    print(f"図を保存しました: {save_path}")
+    print(f"✅図を保存しました: {save_path}")
 

@@ -10,13 +10,6 @@ import os
 # ==============================
 # === テストケースの定義部 ===
 # ==============================
-
-test_cases = [
-    (["data/LC1_2_2.txt", "data/LC1_2_6.txt"], [(0, 0), (42, -42)]),
-    (["data/LC1_2_2.txt", "data/LC1_2_7.txt"], [(0, 0), (-32, -32)]),
-    (["data/LC1_2_4.txt", "data/LC1_2_7.txt"], [(0, 0), (-30, 0)]),
-    (["data/LC1_2_4.txt", "data/LC1_2_8.txt"], [(0, 0), (-30, 0)])
-]
 """
 test_cases = [
     (["data/LC1_2_2.txt", "data/LC1_2_6.txt"], [(0, 0), (42, -42)]),
@@ -31,6 +24,12 @@ test_cases = [
     (["data/LR1_2_10.txt", "data/LR1_2_8.txt"], [(0, 0), (0, 30)])
 ]
 """
+
+test_cases = [
+    (["data/LR1_2_10.txt", "data/LR1_2_8.txt"], [(0, 0), (0, 30)]),
+    (["data/LR1_2_10.txt", "data/test1.txt"], [(0, 0), (0, 30)])
+]
+
 # ==============================
 # === テストケースの実行部 ===
 # ==============================
@@ -98,6 +97,27 @@ for case_index, (file_paths, offsets) in enumerate(test_cases, 1):
                 route = routes[vehicle_index]
                 print(f"  Vehicle {vehicle_index + 1}: {' -> '.join(map(str, route))}")
                 vehicle_index += 1
+                
+    def compute_company_costs(routes, all_customers, vehicle_num_list):
+        """各LSPごとの総コストを計算する"""
+        company_costs = []
+        vehicle_index = 0
+        for num_vehicles in vehicle_num_list:
+            lsp_cost = 0
+            for _ in range(num_vehicles):
+                lsp_cost += route_cost(routes[vehicle_index], all_customers)
+                vehicle_index += 1
+            company_costs.append(lsp_cost)
+        return company_costs
+
+    current_company_costs = compute_company_costs(routes, all_customers, vehicle_num_list)
+    previous_company_costs = current_company_costs.copy()
+    print("---- 各LSPのコスト ----")
+    for idx, (prev_c, curr_c) in enumerate(zip(previous_company_costs, current_company_costs), 1):
+        improvement = (prev_c - curr_c) / prev_c * 100 if prev_c != 0 else 0
+        print(f"LSP {idx}: {curr_c:.2f} （前回比 {improvement:+.2f}%）")
+    print("-------------------------\n")
+
 
     #print("=== 初期経路 ===")  
     #print_routes_with_lsp_separator(routes, vehicle_num_list)
@@ -111,13 +131,25 @@ for case_index, (file_paths, offsets) in enumerate(test_cases, 1):
         print(f"=== gat改善：{i}回目 ===")
         
         routes = perform_gat_exchange(
-            routes, all_customers, all_PD_pairs, vehicle_capacity=vehicle_capacity
+            routes, all_customers, all_PD_pairs, vehicle_capacity, vehicle_num_list
         )
         plot_routes(all_customers, routes, depot_id_list, vehicle_num_list, iteration=i, instance_name=instance_name)
         export_vrp_state(all_customers, routes, all_PD_pairs, i, case_index,
                  depot_id_list=depot_id_list, vehicle_num_list=vehicle_num_list)
         #print_routes_with_lsp_separator(routes, vehicle_num_list)
         
+                # === 各LSPごとのコスト計算 ===
+        current_company_costs = compute_company_costs(routes, all_customers, vehicle_num_list)
+        
+        print("---- 各LSPのコスト ----")
+        for idx, (prev_c, curr_c) in enumerate(zip(previous_company_costs, current_company_costs), 1):
+            improvement = (prev_c - curr_c) / prev_c * 100 if prev_c != 0 else 0
+            print(f"LSP {idx}: {curr_c:.2f} （前回比 {improvement:+.2f}%）")
+        print("-------------------------\n")
+
+        # 次回比較用に保存
+        previous_company_costs = current_company_costs.copy()
+
         # コスト改善率計算
         current_cost = sum(route_cost(route, all_customers) for route in routes)
         from_initial = (initial_cost - current_cost) / initial_cost * 100

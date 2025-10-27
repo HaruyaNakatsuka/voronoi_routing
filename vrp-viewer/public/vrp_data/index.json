@@ -5,7 +5,31 @@
       "steps": [
         "step_0.json",
         "step_1.json",
-        "step_2.json"
+        "step_10.json",
+        "step_2.json",
+        "step_3.json",
+        "step_4.json",
+        "step_5.json",
+        "step_6.json",
+        "step_7.json",
+        "step_8.json",
+        "step_9.json"
+      ]
+    },
+    {
+      "name": "case_10",
+      "steps": [
+        "step_0.json",
+        "step_1.json",
+        "step_10.json",
+        "step_2.json",
+        "step_3.json",
+        "step_4.json",
+        "step_5.json",
+        "step_6.json",
+        "step_7.json",
+        "step_8.json",
+        "step_9.json"
       ]
     },
     {
@@ -14,7 +38,9 @@
         "step_0.json",
         "step_1.json",
         "step_2.json",
-        "step_3.json"
+        "step_3.json",
+        "step_4.json",
+        "step_5.json"
       ]
     },
     {
@@ -37,6 +63,66 @@
         "step_4.json",
         "step_5.json",
         "step_6.json"
+      ]
+    },
+    {
+      "name": "case_5",
+      "steps": [
+        "step_0.json",
+        "step_1.json",
+        "step_2.json",
+        "step_3.json",
+        "step_4.json"
+      ]
+    },
+    {
+      "name": "case_6",
+      "steps": [
+        "step_0.json",
+        "step_1.json",
+        "step_2.json",
+        "step_3.json",
+        "step_4.json",
+        "step_5.json",
+        "step_6.json",
+        "step_7.json"
+      ]
+    },
+    {
+      "name": "case_7",
+      "steps": [
+        "step_0.json",
+        "step_1.json",
+        "step_2.json",
+        "step_3.json",
+        "step_4.json",
+        "step_5.json",
+        "step_6.json",
+        "step_7.json"
+      ]
+    },
+    {
+      "name": "case_8",
+      "steps": [
+        "step_0.json",
+        "step_1.json",
+        "step_2.json",
+        "step_3.json",
+        "step_4.json",
+        "step_5.json",
+        "step_6.json",
+        "step_7.json"
+      ]
+    },
+    {
+      "name": "case_9",
+      "steps": [
+        "step_0.json",
+        "step_1.json",
+        "step_2.json",
+        "step_3.json",
+        "step_4.json",
+        "step_5.json"
       ]
     }
   ]

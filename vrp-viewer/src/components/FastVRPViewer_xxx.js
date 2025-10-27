@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { Stage, Layer, Line, Circle } from "react-konva";
 
 /**
- * FastVRPViewer（ハイライト対応＋y反転＋ズーム＋パン）
+ * FastVRPViewer（ハイライト + y反転 + ズーム + PDペア線付き）
  */
 export default function FastVRPViewer({
   customers,
@@ -12,20 +12,15 @@ export default function FastVRPViewer({
   vehicle_num_list = [],
 }) {
   const [selected, setSelected] = useState(null);
-  const [highlightedRouteIndex, setHighlightedRouteIndex] = useState(null); // ←追加
+  const [highlightedRouteIndex, setHighlightedRouteIndex] = useState(null);
   const stageRef = useRef(null);
 
   const companyColors = [
-    "#007BFF",
-    "#28A745",
-    "#FFC107",
-    "#DC3545",
-    "#6F42C1",
-    "#20C997",
-    "#FF6B6B",
-    "#6BCB77",
+    "#007BFF", "#28A745", "#FFC107", "#DC3545",
+    "#6F42C1", "#20C997", "#FF6B6B", "#6BCB77",
   ];
 
+  // --- データ辞書 ---
   const idToCoord = Object.fromEntries(
     customers.map((c) => [c.id, { x: Number(c.x), y: Number(c.y) }])
   );
@@ -36,7 +31,7 @@ export default function FastVRPViewer({
     ])
   );
 
-  // --- 各経路の所属会社を決定 ---
+  // --- 経路の所属会社マッピング ---
   const vehicleToCompany = [];
   let vIdx = 0;
   for (let compIdx = 0; compIdx < vehicle_num_list.length; compIdx++) {
@@ -49,7 +44,7 @@ export default function FastVRPViewer({
   for (; vIdx < routes.length; vIdx++)
     vehicleToCompany[vIdx] = Math.max(0, vehicleToCompany.length - 1);
 
-  // --- ステージサイズ・座標設定 ---
+  // --- ステージとスケール関連 ---
   const [stageSize, setStageSize] = useState({ width: 900, height: 700 });
   const [scale, setScale] = useState(1);
   const [position, setPosition] = useState({ x: 0, y: 0 });
@@ -60,6 +55,7 @@ export default function FastVRPViewer({
   const minY = Math.min(...allCoords.map((p) => p.y));
   const maxY = Math.max(...allCoords.map((p) => p.y));
 
+  // y座標を反転
   const invertY = (y) => maxY - (y - minY);
 
   const padding = 40;
@@ -83,7 +79,7 @@ export default function FastVRPViewer({
     setPosition(newPos);
   }, [customers]);
 
-  // --- ズーム ---
+  // --- ズーム処理 ---
   const handleWheel = (e) => {
     e.evt.preventDefault();
     const stage = stageRef.current;
@@ -111,24 +107,23 @@ export default function FastVRPViewer({
     stage.batchDraw();
   };
 
-  // --- ID → 描画座標 ---
   const idToPoint = (id) => {
     const p = idToCoord[id];
     return { x: p.x, y: invertY(p.y) };
   };
 
-  // --- 背景クリックでハイライト解除 ---
+  // --- イベント処理 ---
   const handleBackgroundClick = () => {
     setHighlightedRouteIndex(null);
     setSelected(null);
   };
 
-  // --- ノードクリック ---
   const handleNodeClick = (nodeId) => {
     const node = idToCoord[nodeId];
     const partner =
       PD_pairs[nodeId] ||
       Object.entries(PD_pairs).find(([p, d]) => d === nodeId)?.[0];
+
     setSelected({
       id: nodeId,
       x: node.x,
@@ -137,12 +132,10 @@ export default function FastVRPViewer({
       partnerCoord: partner ? idToCoord[partner] : null,
     });
 
-    // クリックしたノードを含む経路をハイライト
     const idx = routes.findIndex((r) => r.includes(nodeId));
     if (idx !== -1) setHighlightedRouteIndex(idx);
   };
 
-  // --- 辺クリック ---
   const handleLineClick = (i) => {
     setHighlightedRouteIndex(i);
     setSelected(null);
@@ -162,7 +155,7 @@ export default function FastVRPViewer({
           scaleY={scale}
           x={position.x}
           y={position.y}
-          onClick={handleBackgroundClick} // ← 背景クリック
+          onClick={handleBackgroundClick}
           style={{ border: "1px solid #ccc", background: "#fff" }}
         >
           <Layer>
@@ -174,7 +167,6 @@ export default function FastVRPViewer({
               });
               const compIdx = vehicleToCompany[i] || 0;
               const stroke = companyColors[compIdx % companyColors.length];
-
               const isHighlighted =
                 highlightedRouteIndex === null || highlightedRouteIndex === i;
 
@@ -188,7 +180,7 @@ export default function FastVRPViewer({
                   lineJoin="round"
                   lineCap="round"
                   onClick={(e) => {
-                    e.cancelBubble = true; // 背景クリックを防ぐ
+                    e.cancelBubble = true;
                     handleLineClick(i);
                   }}
                 />
@@ -200,7 +192,7 @@ export default function FastVRPViewer({
               const p = idToPoint(c.id);
               const fill =
                 idToType[c.id] === "pickup"
-                  ? "#28A745"
+                  ? "#28a746ff"
                   : idToType[c.id] === "delivery"
                   ? "#FFC107"
                   : "#007BFF";
@@ -228,7 +220,23 @@ export default function FastVRPViewer({
               );
             })}
 
-            {/* デポ強調 */}
+            {/* PDペア点線 (新機能) */}
+            {selected && selected.partnerCoord && (
+              <Line
+                points={[
+                  selected.x,
+                  invertY(selected.y),
+                  selected.partnerCoord.x,
+                  invertY(selected.partnerCoord.y),
+                ]}
+                stroke="#FF3333"
+                strokeWidth={2 / (scale || 1)}
+                dash={[6, 4]}
+                opacity={0.8}
+              />
+            )}
+
+            {/* デポ枠 */}
             {depot_id_list.map((dId) => {
               if (!(dId in idToCoord)) return null;
               const p = idToPoint(dId);
@@ -262,24 +270,15 @@ export default function FastVRPViewer({
         <h3>ノード情報</h3>
         {selected ? (
           <>
-            <p>
-              <b>ID:</b> {selected.id}
-            </p>
-            <p>
-              <b>座標:</b> ({selected.x.toFixed(1)}, {selected.y.toFixed(1)})
-            </p>
-            <p>
-              <b>種類:</b> {idToType[selected.id]}
-            </p>
+            <p><b>ID:</b> {selected.id}</p>
+            <p><b>座標:</b> ({selected.x.toFixed(1)}, {selected.y.toFixed(1)})</p>
+            <p><b>種類:</b> {idToType[selected.id]}</p>
             {selected.partnerId && (
               <>
-                <p>
-                  <b>対応ノードID:</b> {selected.partnerId}
-                </p>
+                <p><b>対応ノードID:</b> {selected.partnerId}</p>
                 <p>
                   <b>対応ノード座標:</b> (
-                  {selected.partnerCoord.x.toFixed(1)},{" "}
-                  {selected.partnerCoord.y.toFixed(1)})
+                  {selected.partnerCoord.x.toFixed(1)}, {selected.partnerCoord.y.toFixed(1)})
                 </p>
               </>
             )}

@@ -176,7 +176,7 @@ export default function FastVRPViewer({
                   key={`route_${i}`}
                   points={pts}
                   stroke={stroke}
-                  strokeWidth={isHighlighted ? 3 / (scale || 1) : 1 / (scale || 1)}
+                  strokeWidth={isHighlighted ? 1.8 / (scale || 1) : 0.6 / (scale || 1)}
                   opacity={isHighlighted ? 1 : 0.2}
                   lineJoin="round"
                   lineCap="round"
@@ -193,9 +193,9 @@ export default function FastVRPViewer({
               const p = idToPoint(c.id);
               const fill =
                 idToType[c.id] === "pickup"
-                  ? "#28A745"
+                  ? "#9f4eadff"
                   : idToType[c.id] === "delivery"
-                  ? "#FFC107"
+                  ? "#ddb0eae7"
                   : "#007BFF";
 
               const routeIndex = routes.findIndex((r) => r.includes(c.id));
