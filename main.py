@@ -112,7 +112,7 @@ for case_index, (file_paths, offsets) in enumerate(test_cases, 1):
     for idx, (prev_c, curr_c) in enumerate(zip(previous_company_costs, current_company_costs), 1):
         improvement = (prev_c - curr_c) / prev_c * 100 if prev_c != 0 else 0
         print(f"LSP {idx}: {curr_c:.2f} （前回比 {improvement:+.2f}%）")
-    print("-------------------------\n")
+    print("-------------------------")
 
 
     #print("=== 初期経路 ===")  
@@ -124,28 +124,29 @@ for case_index, (file_paths, offsets) in enumerate(test_cases, 1):
     #       ==========================
     i=1
     while True:
-        print(f"=== gat改善：{i}回目 ===")
+        print(f"\n=== gat改善：{i}回目 ===")
         
+        # === 経路生成 ===
         routes = perform_gat_exchange(
             routes, all_customers, all_PD_pairs, vehicle_capacity, vehicle_num_list
         )
-        plot_routes(all_customers, routes, depot_id_list, vehicle_num_list, iteration=i, instance_name=instance_name)
-        export_vrp_state(all_customers, routes, all_PD_pairs, i, case_index=case_index,
-                         depot_id_list=depot_id_list, vehicle_num_list=vehicle_num_list,
-                         instance_name=instance_name, output_root="web_data")
-        #print_routes_with_lsp_separator(routes, vehicle_num_list)
-        
-                # === 各LSPごとのコスト計算 ===
+
+        # === 各LSPごとのコスト計算 ===
         current_company_costs = compute_company_costs(routes, all_customers, vehicle_num_list)
-        
         print("---- 各LSPのコスト ----")
         for idx, (prev_c, curr_c) in enumerate(zip(previous_company_costs, current_company_costs), 1):
             improvement = (prev_c - curr_c) / prev_c * 100 if prev_c != 0 else 0
             print(f"LSP {idx}: {curr_c:.2f} （前回比 {improvement:+.2f}%）")
-        print("-------------------------\n")
-
-        # 次回比較用に保存
-        previous_company_costs = current_company_costs.copy()
+        print("-------------------------")
+        previous_company_costs = current_company_costs.copy()# 次回比較用に保存
+        
+        # === 経路を図に保存 ===
+        plot_routes(all_customers, routes, depot_id_list, vehicle_num_list, iteration=i, instance_name=instance_name)
+        # === react用jsonファイル生成 ===
+        export_vrp_state(all_customers, routes, all_PD_pairs, i, case_index=case_index,
+                         depot_id_list=depot_id_list, vehicle_num_list=vehicle_num_list,
+                         instance_name=instance_name, output_root="web_data")
+        #print_routes_with_lsp_separator(routes, vehicle_num_list)
 
         # コスト改善率計算
         current_cost = sum(route_cost(route, all_customers) for route in routes)
@@ -161,7 +162,7 @@ for case_index, (file_paths, offsets) in enumerate(test_cases, 1):
             previous_cost = current_cost
             i=i+1
 
-    generate_index_json(output_root="web_data", target_root="vrp-viewer/public/vrp_data")
+    generate_index_json(instance_name=instance_name, output_root="web_data", target_root="vrp-viewer/public/vrp_data")
 
     # 経路改善終了, 実行時間表示
     end_time = time.time()

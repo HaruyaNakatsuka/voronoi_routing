@@ -57,43 +57,78 @@ def export_vrp_state(customers, routes, PD_pairs, step_index, case_index=None,
     print(f"✅ VRP状態を出力しました: {json_path}")
     return json_path  # 返しておくとテストやログに便利
 
-def generate_index_json(output_root="web_data", target_root="vrp-viewer/public/vrp_data"):
-    """
-    web_data フォルダ内のすべての instance_name フォルダを走査し、
-    target_root にコピーして React 用の index.json を作成する。
 
-    出力形式:
-    { "cases": [ {"name": "<instance_name>", "steps": ["step_0.json", ...]}, ... ] }
-
-    - 既に target_root に同名フォルダがあれば上書き（コピー）する。
+def generate_index_json(instance_name: str,
+                        output_root: str = "web_data",
+                        target_root: str = "vrp-viewer/public/vrp_data"):
     """
+    目的:
+      直前に export_vrp_state で生成した「特定インスタンス」のJSON群だけを
+      vrp-viewer/public/vrp_data に反映し、index.json を部分更新する。
+
+    処理:
+      1) web_data/<instance_name>/ を確認
+      2) vrp-viewer/public/vrp_data/<instance_name>/ が既にあれば削除してから再コピー
+      3) vrp-viewer/public/vrp_data/index.json を読み込み、同名エントリを削除
+      4) コピー先の <instance_name> 内の JSON を列挙し、{"name": ..., "steps": [...]} を作成
+      5) 既存 cases に新エントリを追加して index.json を保存
+
+    引数:
+      instance_name: 今回更新するケース名（例: "LC1_2_2_LC1_2_7"）
+      output_root:   Python 側の出力ルート（web_data）
+      target_root:   React 側の参照ルート（vrp-viewer/public/vrp_data）
+
+    戻り値:
+      index.json のパス
+    """
+    if not instance_name or not isinstance(instance_name, str):
+        raise ValueError("generate_index_json: 'instance_name' は必須です。")
+
+    src_case_dir = os.path.join(output_root, instance_name)
+    if not os.path.isdir(src_case_dir):
+        raise FileNotFoundError(f"ソースが見つかりません: {src_case_dir}")
 
     os.makedirs(target_root, exist_ok=True)
-    cases = []
 
-    for case_dir in sorted(glob.glob(os.path.join(output_root, "*"))):
-        if not os.path.isdir(case_dir):
-            continue
+    # 1) 先に対象インスタンスのコピー先をキレイにする
+    dst_case_dir = os.path.join(target_root, instance_name)
+    if os.path.exists(dst_case_dir):
+        print(f"⚠️ 既存インスタンスを削除します: {dst_case_dir}")
+        shutil.rmtree(dst_case_dir)
 
-        case_name = os.path.basename(case_dir)
-        steps = sorted([f for f in os.listdir(case_dir) if f.endswith(".json")])
-        cases.append({"name": case_name, "steps": steps})
+    # 2) 当該インスタンスだけコピー
+    shutil.copytree(src_case_dir, dst_case_dir)
+    print(f"📁 コピー完了: {src_case_dir} → {dst_case_dir}")
 
-        dest_case_dir = os.path.join(target_root, case_name)
-        if os.path.exists(dest_case_dir):
-            print(f"⚠️ 既存フォルダを削除します: {dest_case_dir}")
-            shutil.rmtree(dest_case_dir)
-
-        shutil.copytree(case_dir, dest_case_dir)
-        print(f"📁 コピー完了: {case_dir} → {dest_case_dir}")
-
+    # 3) 既存 index.json を読み込み（なければ空テンプレート）
     index_path = os.path.join(target_root, "index.json")
     if os.path.exists(index_path):
-        print(f"⚠️ 既存の index.json を削除します: {index_path}")
-        os.remove(index_path)
+        try:
+            with open(index_path, "r", encoding="utf-8") as f:
+                index_data = json.load(f)
+            if not isinstance(index_data, dict) or "cases" not in index_data or not isinstance(index_data["cases"], list):
+                # 想定外形式のときはリセット
+                index_data = {"cases": []}
+        except Exception:
+            # 壊れていた場合もリセット
+            index_data = {"cases": []}
+    else:
+        index_data = {"cases": []}
 
+    # 4) index.cases から同名インスタンスを削除
+    cases = [c for c in index_data.get("cases", []) if not (isinstance(c, dict) and c.get("name") == instance_name)]
+
+    # 5) コピー先のファイルから steps を作成（step_*.json を名前順ソート）
+    steps = sorted([os.path.basename(p)
+                    for p in glob.glob(os.path.join(dst_case_dir, "step_*.json"))])
+
+    # 6) 新しいエントリを追加
+    cases.append({"name": instance_name, "steps": steps})
+
+    # 7) index.json を保存（上書き）
+    index_data = {"cases": cases}
     with open(index_path, "w", encoding="utf-8") as f:
-        json.dump({"cases": cases}, f, indent=2, ensure_ascii=False)
+        json.dump(index_data, f, indent=2, ensure_ascii=False)
 
-    print(f"✅ index.json を生成しました → {index_path}")
+    print(f"✅ index.json を更新しました → {index_path}")
     return index_path
