@@ -1,22 +1,6 @@
 {
   "cases": [
     {
-      "name": "LR1_2_10_LR1_2_3",
-      "steps": [
-        "step_0.json",
-        "step_1.json",
-        "step_2.json"
-      ]
-    },
-    {
-      "name": "LR1_2_10_LR1_2_8",
-      "steps": [
-        "step_0.json",
-        "step_1.json",
-        "step_2.json"
-      ]
-    },
-    {
       "name": "LC1_2_2_LC1_2_6",
       "steps": [
         "step_0.json",
@@ -74,6 +58,22 @@
     },
     {
       "name": "LR1_2_8_LR1_2_9",
+      "steps": [
+        "step_0.json",
+        "step_1.json",
+        "step_2.json"
+      ]
+    },
+    {
+      "name": "LR1_2_10_LR1_2_3",
+      "steps": [
+        "step_0.json",
+        "step_1.json",
+        "step_2.json"
+      ]
+    },
+    {
+      "name": "LR1_2_10_LR1_2_8",
       "steps": [
         "step_0.json",
         "step_1.json",

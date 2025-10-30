@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import os
+import shutil  # ★追加
 
 def plot_routes(customers, routes, depot_id_list, vehicle_num_list, iteration, instance_name="", output_dir="figures"):
     """
@@ -15,6 +16,11 @@ def plot_routes(customers, routes, depot_id_list, vehicle_num_list, iteration, i
 
     # 各実験ごとにフォルダを作成
     instance_folder = os.path.join(output_dir, instance_name)
+
+    # ★変更点: 初回保存（iteration==0）のときだけ既存フォルダを全消去→作り直し
+    if iteration == 0 and os.path.isdir(instance_folder):
+        shutil.rmtree(instance_folder)
+
     os.makedirs(instance_folder, exist_ok=True)
 
     # ID -> 座標辞書を作成
