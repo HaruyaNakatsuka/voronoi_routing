@@ -1,16 +1,17 @@
 from parser import parse_lilim200
 from flexible_vrp_solver import route_cost
-from gat import initialize_individual_vrps, perform_gat_exchange
+from gat import initialize_individual_vrps, perform_gat_exchange  # 初期解生成/GAT社内最適化で流用
 from visualizer import plot_routes
 from web_exporter import export_vrp_state, generate_index_json
+from voronoi_allocator import perform_voronoi_routing  # ボロノイ再配布＋各社VRP
 import time
 import os
+from itertools import chain
 
 
 # ==============================
 # === テストケースの定義部 ===
 # ==============================
-
 test_cases = [
     (["data/LC1_2_2.txt", "data/LC1_2_6.txt"], [(0, 0), (42, -42)]),
     (["data/LC1_2_2.txt", "data/LC1_2_7.txt"], [(0, 0), (-32, -32)]),
@@ -25,17 +26,56 @@ test_cases = [
 ]
 
 
+def compute_company_costs(routes, all_customers, vehicle_num_list):
+    """vehicle_num_list に従って routes を会社ごとに分割し、各社の合計 route_cost を返す"""
+    costs = []
+    vidx = 0
+    for n in vehicle_num_list:
+        s = 0.0
+        for _ in range(n):
+            s += route_cost(routes[vidx], all_customers)
+            vidx += 1
+        costs.append(s)
+    return costs
+
+
+def split_routes_by_company(routes, vehicle_num_list):
+    """全車両ルート配列を company ごとのサブ配列に分割"""
+    out = []
+    idx = 0
+    for n in vehicle_num_list:
+        out.append(routes[idx: idx + n])
+        idx += n
+    return out
+
+
+def flatten(list_of_lists):
+    return list(chain.from_iterable(list_of_lists))
+
+
+def filter_subcustomers_by_routes(all_customers, company_routes):
+    """その会社のルートに登場するノードのみを抽出して customers を縮約"""
+    node_ids = set()
+    for r in company_routes:
+        node_ids.update(r)
+    return [c for c in all_customers if c["id"] in node_ids]
+
+
+def filter_pd_pairs_for_nodes(all_PD_pairs, node_ids_set):
+    """PD両端が node_ids_set に含まれるペアのみ残す"""
+    return {p: d for p, d in all_PD_pairs.items() if p in node_ids_set and d in node_ids_set}
+
+
 # ==============================
 # === テストケースの実行部 ===
 # ==============================
 for case_index, (file_paths, offsets) in enumerate(test_cases, 1):
-    print("\n" + "="*50)
+    print("\n" + "="*60)
     print(f"テストケース {case_index}: {file_paths[0]} + {file_paths[1]}")
     print(f"オフセット: {offsets[0]} , {offsets[1]}")
-    print("="*50)
-    
+    print("="*60)
+
     instance_name = f"{os.path.basename(file_paths[0]).split('.')[0]}_{os.path.basename(file_paths[1]).split('.')[0]}"
-    
     start_time = time.time()
 
     num_lsps = len(file_paths)
@@ -47,31 +87,27 @@ for case_index, (file_paths, offsets) in enumerate(test_cases, 1):
     vehicle_num_list = []
     vehicle_capacity = None
 
-    # === データファイルをパース ===
-    id_offset = 0  # 初期IDオフセット
+    # === データファイルをパース（座標・IDオフセットを付与し結合）===
+    id_offset = 0
     for path, offset in zip(file_paths, offsets):
         data = parse_lilim200(path, x_offset=offset[0], y_offset=offset[1], id_offset=id_offset)
 
-        # データ蓄積
         all_customers.extend(data['customers'])
         all_PD_pairs.update(data['PD_pairs'])
         depot_id_list.append(data['depot_id'])
         depot_coords.append(data['depot_coord'])
         vehicle_num_list.append(data['num_vehicles'])
         num_vehicles += data['num_vehicles']
-        
-        # IDオフセットを次に備えて更新
+
         max_id = max(c['id'] for c in data['customers'])
         id_offset = max_id + 1
 
-        # 車両容量の情報を保存（全ファイルで同じ前提）
         if vehicle_capacity is None:
             vehicle_capacity = data['vehicle_capacity']
 
-
-    #      =============================
-    #      === LSP個別経路生成フェーズ ===
-    #      =============================
+    # =============================
+    # === 初期：LSP個別の経路生成 ===
+    # =============================
     routes = initialize_individual_vrps(
         all_customers, all_PD_pairs, num_lsps, vehicle_num_list, depot_id_list, vehicle_capacity=vehicle_capacity
     )
@@ -79,93 +115,127 @@ for case_index, (file_paths, offsets) in enumerate(test_cases, 1):
     export_vrp_state(all_customers, routes, all_PD_pairs, 0, case_index=case_index,
                      depot_id_list=depot_id_list, vehicle_num_list=vehicle_num_list,
                      instance_name=instance_name, output_root="web_data")
-    
-    initial_cost = sum(route_cost(route, all_customers) for route in routes)
-    print(f"初期経路コスト＝{initial_cost}")
-    previous_cost = initial_cost
-    
 
-    def print_routes_with_lsp_separator(routes, vehicle_num_list):
-        vehicle_index = 0
-        for lsp_index, num_vehicles in enumerate(vehicle_num_list):
-            print(f"--- LSP {lsp_index + 1} ---")
-            for _ in range(num_vehicles):
-                route = routes[vehicle_index]
-                print(f"  Vehicle {vehicle_index + 1}: {' -> '.join(map(str, route))}")
-                vehicle_index += 1
-                
-    def compute_company_costs(routes, all_customers, vehicle_num_list):
-        """各LSPごとの総コストを計算する"""
-        company_costs = []
-        vehicle_index = 0
-        for num_vehicles in vehicle_num_list:
-            lsp_cost = 0
-            for _ in range(num_vehicles):
-                lsp_cost += route_cost(routes[vehicle_index], all_customers)
-                vehicle_index += 1
-            company_costs.append(lsp_cost)
-        return company_costs
+    # 初期コスト（会社別・総計）
+    initial_company_costs = compute_company_costs(routes, all_customers, vehicle_num_list)
+    initial_total_cost = sum(initial_company_costs)
 
-    current_company_costs = compute_company_costs(routes, all_customers, vehicle_num_list)
-    previous_company_costs = current_company_costs.copy()
-    print("---- 各LSPのコスト ----")
-    for idx, (prev_c, curr_c) in enumerate(zip(previous_company_costs, current_company_costs), 1):
-        improvement = (prev_c - curr_c) / prev_c * 100 if prev_c != 0 else 0
-        print(f"LSP {idx}: {curr_c:.2f} （前回比 {improvement:+.2f}%）")
-    print("-------------------------")
+    print("\n==== 初期経路：会社別コスト ====")
+    for idx, c in enumerate(initial_company_costs, 1):
+        print(f"LSP {idx}: {c:.2f}")
+    print(f"TOTAL: {initial_total_cost:.2f}")
 
+    # ==========================================
+    # === Voronoi再配布 → 各社で一発最適化 ===
+    # ==========================================
+    print("\n=== Voronoi再配布による経路決定を実行します ===")
+    voronoi_routes = perform_voronoi_routing(
+        customers=all_customers,
+        PD_pairs=all_PD_pairs,
+        depot_id_list=depot_id_list,
+        vehicle_num_list=vehicle_num_list,
+        vehicle_capacity=vehicle_capacity
+    )
 
-    #print("=== 初期経路 ===")  
-    #print_routes_with_lsp_separator(routes, vehicle_num_list)
+    # ボロノイ後コスト（会社別・総計）
+    voronoi_company_costs = compute_company_costs(voronoi_routes, all_customers, vehicle_num_list)
+    voronoi_total_cost = sum(voronoi_company_costs)
 
+    print("\n==== ボロノイ分割後：会社別コスト ====")
+    for idx, c in enumerate(voronoi_company_costs, 1):
+        print(f"LSP {idx}: {c:.2f}")
+    print(f"TOTAL: {voronoi_total_cost:.2f}")
 
-    #       ==========================
-    #       ===== GAT改善フェーズ =====
-    #       ==========================
-    i=1
-    while True:
-        print(f"\n=== gat改善：{i}回目 ===")
-        
-        # === 経路生成 ===
-        routes = perform_gat_exchange(
-            routes, all_customers, all_PD_pairs, vehicle_capacity, vehicle_num_list
-        )
+    # 各社改善率（初期 → ボロノイ）
+    print("\n==== 各社の改善率（初期 → ボロノイ） ====")
+    for idx, (c0, c1) in enumerate(zip(initial_company_costs, voronoi_company_costs), 1):
+        improve = ((c0 - c1) / c0 * 100.0) if c0 > 0 else 0.0
+        sign = "+" if improve >= 0 else ""
+        print(f"LSP {idx}: {sign}{improve:.2f}% ( {c0:.2f} → {c1:.2f} )")
 
-        # === 各LSPごとのコスト計算 ===
-        current_company_costs = compute_company_costs(routes, all_customers, vehicle_num_list)
-        print("---- 各LSPのコスト ----")
-        for idx, (prev_c, curr_c) in enumerate(zip(previous_company_costs, current_company_costs), 1):
-            improvement = (prev_c - curr_c) / prev_c * 100 if prev_c != 0 else 0
-            print(f"LSP {idx}: {curr_c:.2f} （前回比 {improvement:+.2f}%）")
-        print("-------------------------")
-        previous_company_costs = current_company_costs.copy()# 次回比較用に保存
-        
-        # === 経路を図に保存 ===
-        plot_routes(all_customers, routes, depot_id_list, vehicle_num_list, iteration=i, instance_name=instance_name)
-        # === react用jsonファイル生成 ===
-        export_vrp_state(all_customers, routes, all_PD_pairs, i, case_index=case_index,
-                         depot_id_list=depot_id_list, vehicle_num_list=vehicle_num_list,
-                         instance_name=instance_name, output_root="web_data")
-        #print_routes_with_lsp_separator(routes, vehicle_num_list)
+    overall_improve_voronoi = ((initial_total_cost - voronoi_total_cost) / initial_total_cost * 100.0) if initial_total_cost > 0 else 0.0
+    sign_total = "+" if overall_improve_voronoi >= 0 else ""
+    print("\n==== 全体改善率（初期 → ボロノイ） ====")
+    print(f"{sign_total}{overall_improve_voronoi:.2f}% ( {initial_total_cost:.2f} → {voronoi_total_cost:.2f} )")
 
-        # コスト改善率計算
-        current_cost = sum(route_cost(route, all_customers) for route in routes)
-        from_initial = (initial_cost - current_cost) / initial_cost * 100
-        from_previous = (previous_cost - current_cost) / previous_cost * 100
-        #print(f"[初期ルートからのコスト改善率] {from_initial:.2f}%")
-        #print(f"[前回経路からのコスト改善率] {from_previous:.2f}%")
-        if round(from_previous, 1) == 0.0:
-            print(f"最終コスト＝{current_cost}")
-            print(f"初期ルートからのコスト改善率＝ {from_initial:.2f}%")
-            break
-        else:
-            previous_cost = current_cost
-            i=i+1
+    # 可視化 & Web出力（Step 1 として保存）
+    plot_routes(all_customers, voronoi_routes, depot_id_list, vehicle_num_list, iteration=1, instance_name=instance_name)
+    export_vrp_state(all_customers, voronoi_routes, all_PD_pairs, 1, case_index=case_index,
+                     depot_id_list=depot_id_list, vehicle_num_list=vehicle_num_list,
+                     instance_name=instance_name, output_root="web_data")
 
+    # =======================================================
+    # === 社内限定の GAT 改善（会社ごとに独立に繰り返し） ===
+    # =======================================================
+    print("\n=== 社内限定GATによる経路改善を実行します（会社横断の交換は行わない） ===")
+    per_company_routes = split_routes_by_company(voronoi_routes, vehicle_num_list)
+    improved_company_routes = []
+
+    for comp_idx, company_routes in enumerate(per_company_routes):
+        # 会社のサブ顧客集合を抽出（その会社ルートに登場するノードのみ）
+        sub_customers = filter_subcustomers_by_routes(all_customers, company_routes)
+        sub_node_ids = set(c["id"] for c in sub_customers)
+        # PDペアも社内分に限定
+        sub_PD_pairs_dict = filter_pd_pairs_for_nodes(all_PD_pairs, sub_node_ids)
+
+        # 社内GATループ
+        prev_cost = sum(route_cost(r, all_customers) for r in company_routes)
+        iter_count = 1
+        while True:
+            new_company_routes = perform_gat_exchange(
+                company_routes,          # ← 会社内ルートのみ
+                sub_customers,           # ← 会社内の顧客のみ
+                sub_PD_pairs_dict,       # ← 会社内のPDのみ
+                vehicle_capacity,
+                [len(company_routes)]    # ← この会社の台数のみ
+            )
+            new_cost = sum(route_cost(r, all_customers) for r in new_company_routes)
+            from_prev = ((prev_cost - new_cost) / prev_cost * 100.0) if prev_cost > 0 else 0.0
+
+            # 会社内の改善が小さくなったら終了（0.0% 切り上げ判定）
+            if round(from_prev, 1) == 0.0:
+                company_routes = new_company_routes
+                break
+            else:
+                company_routes = new_company_routes
+                prev_cost = new_cost
+                iter_count += 1
+
+        improved_company_routes.append(company_routes)
+
+    # 全社の最終ルートを連結
+    gat_final_routes = flatten(improved_company_routes)
+
+    # GAT後コスト（会社別・総計）
+    gat_company_costs = compute_company_costs(gat_final_routes, all_customers, vehicle_num_list)
+    gat_total_cost = sum(gat_company_costs)
+
+    print("\n==== GAT改善後（社内限定）：会社別コスト ====")
+    for idx, c in enumerate(gat_company_costs, 1):
+        print(f"LSP {idx}: {c:.2f}")
+    print(f"TOTAL: {gat_total_cost:.2f}")
+
+    # 各社改善率（ボロノイ → GAT）
+    print("\n==== 各社の改善率（ボロノイ → GAT） ====")
+    for idx, (c0, c1) in enumerate(zip(voronoi_company_costs, gat_company_costs), 1):
+        improve = ((c0 - c1) / c0 * 100.0) if c0 > 0 else 0.0
+        sign = "+" if improve >= 0 else ""
+        print(f"LSP {idx}: {sign}{improve:.2f}% ( {c0:.2f} → {c1:.2f} )")
+
+    overall_improve_gat = ((voronoi_total_cost - gat_total_cost) / voronoi_total_cost * 100.0) if voronoi_total_cost > 0 else 0.0
+    sign_total_gat = "+" if overall_improve_gat >= 0 else ""
+    print("\n==== 全体改善率（ボロノイ → GAT） ====")
+    print(f"{sign_total_gat}{overall_improve_gat:.2f}% ( {voronoi_total_cost:.2f} → {gat_total_cost:.2f} )")
+
+    # 追加の可視化 & Web出力（Step 2 として保存）
+    plot_routes(all_customers, gat_final_routes, depot_id_list, vehicle_num_list, iteration=2, instance_name=instance_name)
+    export_vrp_state(all_customers, gat_final_routes, all_PD_pairs, 2, case_index=case_index,
+                     depot_id_list=depot_id_list, vehicle_num_list=vehicle_num_list,
+                     instance_name=instance_name, output_root="web_data")
+
+    # === React側へ今回のインスタンスだけ反映 ===
     generate_index_json(instance_name=instance_name, output_root="web_data", target_root="vrp-viewer/public/vrp_data")
 
-    # 経路改善終了, 実行時間表示
-    end_time = time.time()
-    elapsed = end_time - start_time
-    print(f"=== テストケース {case_index} の実行時間: {elapsed:.2f} 秒 ===")
-    
+    # 実行時間
+    elapsed = time.time() - start_time
+    print(f"\n=== テストケース {case_index} の実行時間: {elapsed:.2f} 秒 ===")

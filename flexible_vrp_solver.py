@@ -12,7 +12,7 @@ def create_distance_matrix(customers):
 
 
 def solve_vrp_flexible(customers, initial_routes, PD_pairs, num_vehicles, vehicle_capacity, start_depots, end_depots,
-                       use_capacity:bool, use_time:bool, use_pickup_delivery:bool, isInitPhase:bool):
+                       use_capacity:bool, use_time:bool, use_pickup_delivery:bool, isGAT:bool):
     # 距離行列を作成
     distance_matrix = create_distance_matrix(customers)
     
@@ -90,11 +90,7 @@ def solve_vrp_flexible(customers, initial_routes, PD_pairs, num_vehicles, vehicl
     search_params = pywrapcp.DefaultRoutingSearchParameters()
     #search_params.log_search = True
 
-    if isInitPhase:
-        search_params.first_solution_strategy = routing_enums_pb2.FirstSolutionStrategy.AUTOMATIC
-        search_params.local_search_metaheuristic = routing_enums_pb2.LocalSearchMetaheuristic.AUTOMATIC
-        solution = routing.SolveWithParameters(search_params)
-    else:
+    if isGAT:
         #search_params.first_solution_strategy = routing_enums_pb2.FirstSolutionStrategy.AUTOMATIC
         search_params.local_search_metaheuristic = routing_enums_pb2.LocalSearchMetaheuristic.AUTOMATIC
 
@@ -106,6 +102,10 @@ def solve_vrp_flexible(customers, initial_routes, PD_pairs, num_vehicles, vehicl
         routing.CloseModelWithParameters(search_params)
         initial_solution = routing.ReadAssignmentFromRoutes(initial_routes_local, True)
         solution = routing.SolveFromAssignmentWithParameters(initial_solution, search_params)
+    else:
+        search_params.first_solution_strategy = routing_enums_pb2.FirstSolutionStrategy.AUTOMATIC
+        search_params.local_search_metaheuristic = routing_enums_pb2.LocalSearchMetaheuristic.AUTOMATIC
+        solution = routing.SolveWithParameters(search_params)
     
     if not solution:
         print("No solution found.")
