@@ -111,19 +111,18 @@ for case_index, (file_paths, offsets) in enumerate(test_cases, 1):
     routes = initialize_individual_vrps(
         all_customers, all_PD_pairs, num_lsps, vehicle_num_list, depot_id_list, vehicle_capacity=vehicle_capacity
     )
-    plot_routes(all_customers, routes, depot_id_list, vehicle_num_list, iteration=0, instance_name=instance_name)
     export_vrp_state(all_customers, routes, all_PD_pairs, 0, case_index=case_index,
                      depot_id_list=depot_id_list, vehicle_num_list=vehicle_num_list,
                      instance_name=instance_name, output_root="web_data")
-
+    plot_routes(all_customers, routes, depot_id_list, vehicle_num_list, iteration=0, instance_name=instance_name)
     # 初期コスト（会社別・総計）
     initial_company_costs = compute_company_costs(routes, all_customers, vehicle_num_list)
     initial_total_cost = sum(initial_company_costs)
-
     print("\n==== 初期経路：会社別コスト ====")
     for idx, c in enumerate(initial_company_costs, 1):
         print(f"LSP {idx}: {c:.2f}")
     print(f"TOTAL: {initial_total_cost:.2f}")
+
 
     # ==========================================
     # === Voronoi再配布 → 各社で一発最適化 ===
@@ -159,10 +158,10 @@ for case_index, (file_paths, offsets) in enumerate(test_cases, 1):
     print(f"{sign_total}{overall_improve_voronoi:.2f}% ( {initial_total_cost:.2f} → {voronoi_total_cost:.2f} )")
 
     # 可視化 & Web出力（Step 1 として保存）
-    plot_routes(all_customers, voronoi_routes, depot_id_list, vehicle_num_list, iteration=1, instance_name=instance_name)
     export_vrp_state(all_customers, voronoi_routes, all_PD_pairs, 1, case_index=case_index,
                      depot_id_list=depot_id_list, vehicle_num_list=vehicle_num_list,
                      instance_name=instance_name, output_root="web_data")
+    plot_routes(all_customers, voronoi_routes, depot_id_list, vehicle_num_list, iteration=1, instance_name=instance_name)
 
     # =======================================================
     # === 社内限定の GAT 改善（会社ごとに独立に繰り返し） ===
@@ -228,10 +227,10 @@ for case_index, (file_paths, offsets) in enumerate(test_cases, 1):
     print(f"{sign_total_gat}{overall_improve_gat:.2f}% ( {voronoi_total_cost:.2f} → {gat_total_cost:.2f} )")
 
     # 追加の可視化 & Web出力（Step 2 として保存）
-    plot_routes(all_customers, gat_final_routes, depot_id_list, vehicle_num_list, iteration=2, instance_name=instance_name)
     export_vrp_state(all_customers, gat_final_routes, all_PD_pairs, 2, case_index=case_index,
                      depot_id_list=depot_id_list, vehicle_num_list=vehicle_num_list,
                      instance_name=instance_name, output_root="web_data")
+    plot_routes(all_customers, gat_final_routes, depot_id_list, vehicle_num_list, iteration=2, instance_name=instance_name)
 
     # === React側へ今回のインスタンスだけ反映 ===
     generate_index_json(instance_name=instance_name, output_root="web_data", target_root="vrp-viewer/public/vrp_data")
