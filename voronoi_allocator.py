@@ -85,7 +85,7 @@ def perform_voronoi_routing(
         ends = [depot_id] * num_vehicles
 
         print(
-            f">>> Voronoi配属(重心) LSP {comp_idx+1}: "
+            f">>> Voronoi分割中 LSP {comp_idx+1}: "
             f"顧客={len(sub_customers)}件, 車両={num_vehicles}台, PD={len(sub_pd_pairs)}組"
         )
 

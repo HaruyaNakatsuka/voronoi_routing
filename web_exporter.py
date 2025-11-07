@@ -2,6 +2,9 @@ import os
 import json
 import glob
 import shutil
+import logging
+
+logger = logging.getLogger(__name__)
 
 def export_vrp_state(customers, routes, PD_pairs, step_index, case_index=None,
                      depot_id_list=None, vehicle_num_list=None, instance_name=None,
@@ -29,7 +32,7 @@ def export_vrp_state(customers, routes, PD_pairs, step_index, case_index=None,
     # --- 初回のみフォルダをクリーンにする ---
     if step_index == 0:
         if os.path.exists(output_dir):
-            print(f"⚠️ 初回ステップのため既存フォルダを削除します: {output_dir}")
+            logger.info(f"⚠️ 初回ステップのため既存フォルダを削除します: {output_dir}")
             shutil.rmtree(output_dir)
         os.makedirs(output_dir, exist_ok=True)
     else:
@@ -54,7 +57,7 @@ def export_vrp_state(customers, routes, PD_pairs, step_index, case_index=None,
     with open(json_path, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
 
-    print(f"✅ VRP状態を出力しました: {json_path}")
+    logger.info(f"✅ VRP状態を出力しました: {json_path}")
     return json_path  # 返しておくとテストやログに便利
 
 
@@ -93,12 +96,12 @@ def generate_index_json(instance_name: str,
     # 1) 先に対象インスタンスのコピー先をキレイにする
     dst_case_dir = os.path.join(target_root, instance_name)
     if os.path.exists(dst_case_dir):
-        print(f"⚠️ 既存インスタンスを削除します: {dst_case_dir}")
+        logger.info(f"⚠️ 既存インスタンスを削除します: {dst_case_dir}")
         shutil.rmtree(dst_case_dir)
 
     # 2) 当該インスタンスだけコピー
     shutil.copytree(src_case_dir, dst_case_dir)
-    print(f"📁 コピー完了: {src_case_dir} → {dst_case_dir}")
+    logger.info(f"📁 コピー完了: {src_case_dir} → {dst_case_dir}")
 
     # 3) 既存 index.json を読み込み（なければ空テンプレート）
     index_path = os.path.join(target_root, "index.json")
@@ -130,5 +133,5 @@ def generate_index_json(instance_name: str,
     with open(index_path, "w", encoding="utf-8") as f:
         json.dump(index_data, f, indent=2, ensure_ascii=False)
 
-    print(f"✅ index.json を更新しました → {index_path}")
+    logger.info(f"✅ index.json を更新しました → {index_path}")
     return index_path

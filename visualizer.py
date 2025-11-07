@@ -4,6 +4,9 @@ import os
 import shutil
 import json
 import math
+import logging
+
+logger = logging.getLogger(__name__)
 
 plt.rcParams['font.family'] = 'MS Gothic'  # Windowsの場合
 plt.rcParams['axes.unicode_minus'] = False
@@ -139,8 +142,8 @@ def plot_routes(customers, routes, depot_id_list, vehicle_num_list, iteration, i
             lines.append(f"  LSP {i}: {fmt(c)}   改善(初期比): {pct(base, c)}")
         base_total = init_metrics["total"] if init_metrics else None
         lines.append(f"  TOTAL: {fmt(curr_total)}   改善(初期比): {pct(base_total, curr_total)}")
-    elif iteration == 2:
-        lines.append("【自社内GAT後】")
+    else:
+        lines.append(f"【自社内GAT{iteration}回目】")
         for i, c in enumerate(curr_company, 1):
             base_v = voro_metrics["company"][i-1] if voro_metrics else None
             base_i = init_metrics["company"][i-1] if init_metrics else None
@@ -168,4 +171,4 @@ def plot_routes(customers, routes, depot_id_list, vehicle_num_list, iteration, i
     save_path = os.path.join(instance_folder, f"routes_iter_{iteration:02d}.png")
     plt.savefig(save_path)
     plt.close()
-    print(f"✅図を保存しました: {save_path}")
+    logger.info(f"✅図を保存しました: {save_path}")

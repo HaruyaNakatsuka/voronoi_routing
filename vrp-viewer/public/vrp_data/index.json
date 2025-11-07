@@ -1,14 +1,6 @@
 {
   "cases": [
     {
-      "name": "LC1_2_2_LC1_2_6",
-      "steps": [
-        "step_0.json",
-        "step_1.json",
-        "step_2.json"
-      ]
-    },
-    {
       "name": "LC1_2_2_LC1_2_7",
       "steps": [
         "step_0.json",
@@ -29,7 +21,9 @@
       "steps": [
         "step_0.json",
         "step_1.json",
-        "step_2.json"
+        "step_2.json",
+        "step_3.json",
+        "step_4.json"
       ]
     },
     {
@@ -37,7 +31,9 @@
       "steps": [
         "step_0.json",
         "step_1.json",
-        "step_2.json"
+        "step_2.json",
+        "step_3.json",
+        "step_4.json"
       ]
     },
     {
@@ -45,7 +41,10 @@
       "steps": [
         "step_0.json",
         "step_1.json",
-        "step_2.json"
+        "step_2.json",
+        "step_3.json",
+        "step_4.json",
+        "step_5.json"
       ]
     },
     {
@@ -53,7 +52,10 @@
       "steps": [
         "step_0.json",
         "step_1.json",
-        "step_2.json"
+        "step_2.json",
+        "step_3.json",
+        "step_4.json",
+        "step_5.json"
       ]
     },
     {
@@ -69,11 +71,25 @@
       "steps": [
         "step_0.json",
         "step_1.json",
-        "step_2.json"
+        "step_2.json",
+        "step_3.json",
+        "step_4.json",
+        "step_5.json",
+        "step_6.json"
       ]
     },
     {
       "name": "LR1_2_10_LR1_2_8",
+      "steps": [
+        "step_0.json",
+        "step_1.json",
+        "step_2.json",
+        "step_3.json",
+        "step_4.json"
+      ]
+    },
+    {
+      "name": "LC1_2_2_LC1_2_6",
       "steps": [
         "step_0.json",
         "step_1.json",
