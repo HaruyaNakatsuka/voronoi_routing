@@ -214,7 +214,7 @@ export default function App() {
           flexWrap: "nowrap",
         }}
       >
-        <h1 style={{ margin: 0, lineHeight: "56px" }}>VRP Route Viewer</h1>
+        <h1 style={{ margin: 0, lineHeight: "56px" }}>VRP Route Viewer（ボロノイ分割→社内GAT）</h1>
 
         {/* 右側：ノード情報（横並びチップ／横スクロール） */}
         <div
