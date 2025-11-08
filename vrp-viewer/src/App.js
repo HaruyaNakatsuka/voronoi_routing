@@ -119,7 +119,21 @@ export default function App() {
       });
   }, [selectedCase, selectedStep]);
 
-  // --- 追加: Step 前後移動ハンドラ（最小変更） ---
+  // --- 追加: Case 前後移動ハンドラ（最小変更） ---
+  const currentCaseIndex = caseList.findIndex((c) => c.name === selectedCase);
+  const hasPrevCase = currentCaseIndex > 0;
+  const hasNextCase = currentCaseIndex >= 0 && currentCaseIndex < caseList.length - 1;
+
+  const goPrevCase = () => {
+    if (!hasPrevCase) return;
+    setSelectedCase(caseList[currentCaseIndex - 1].name);
+  };
+  const goNextCase = () => {
+    if (!hasNextCase) return;
+    setSelectedCase(caseList[currentCaseIndex + 1].name);
+  };
+
+  // --- 既存: Step 前後移動ハンドラ ---
   const currentStepIndex = stepList.findIndex((s) => s === selectedStep);
   const hasPrev = currentStepIndex > 0;
   const hasNext = currentStepIndex >= 0 && currentStepIndex < stepList.length - 1;
@@ -135,15 +149,14 @@ export default function App() {
 
   // --- ノード情報を横並びのチップで表示する部品 ---
   const NodeInfoChips = ({ info }) => {
-    // 1行固定・横スクロールで押し下げを防止
     const wrapStyle = {
       display: "flex",
       alignItems: "center",
       gap: 8,
-      height: 56,                  // ヘッダーの固定高さ
-      overflowX: "auto",           // はみ出たら横スクロール
+      height: 56,
+      overflowX: "auto",
       overflowY: "hidden",
-      whiteSpace: "nowrap",        // 折り返さない
+      whiteSpace: "nowrap",
     };
     const chipStyle = {
       display: "inline-flex",
@@ -223,15 +236,36 @@ export default function App() {
       {/* セレクタ行 */}
       <div style={{ margin: "12px 0", display: "flex", alignItems: "center", gap: 8 }}>
         <label style={{ marginRight: 8 }}>Case:</label>
+
+        {/* 追加: 前のCaseボタン */}
+        <button
+          onClick={goPrevCase}
+          disabled={!hasPrevCase}
+          title="前のケースへ"
+          style={{ padding: "4px 8px" }}
+        >
+          ◀
+        </button>
+
         <select value={selectedCase || ""} onChange={(e) => setSelectedCase(e.target.value)}>
           {caseList.map((c, idx) => (
             <option key={`${c.name}-${idx}`} value={c.name}>{c.name}</option>
           ))}
         </select>
 
+        {/* 追加: 次のCaseボタン */}
+        <button
+          onClick={goNextCase}
+          disabled={!hasNextCase}
+          title="次のケースへ"
+          style={{ padding: "4px 8px" }}
+        >
+          ▶
+        </button>
+
         <label style={{ marginLeft: 16, marginRight: 8 }}>Step:</label>
 
-        {/* 追加: 前へボタン */}
+        {/* 追加: 前へボタン（Step） */}
         <button
           onClick={goPrevStep}
           disabled={!hasPrev}
@@ -241,14 +275,14 @@ export default function App() {
           ◀
         </button>
 
-        {/* 既存のプルダウン */}
+        {/* 既存のプルダウン（Step） */}
         <select value={selectedStep || ""} onChange={(e) => setSelectedStep(e.target.value)}>
           {stepList.map((s, idx) => (
             <option key={`${s}-${idx}`} value={s}>{s}</option>
           ))}
         </select>
 
-        {/* 追加: 次へボタン */}
+        {/* 追加: 次へボタン（Step） */}
         <button
           onClick={goNextStep}
           disabled={!hasNext}
