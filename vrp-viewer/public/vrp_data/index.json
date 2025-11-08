@@ -1,6 +1,14 @@
 {
   "cases": [
     {
+      "name": "LC1_2_2_LC1_2_6",
+      "steps": [
+        "step_0.json",
+        "step_1.json",
+        "step_2.json"
+      ]
+    },
+    {
       "name": "LC1_2_2_LC1_2_7",
       "steps": [
         "step_0.json",
@@ -86,14 +94,6 @@
         "step_2.json",
         "step_3.json",
         "step_4.json"
-      ]
-    },
-    {
-      "name": "LC1_2_2_LC1_2_6",
-      "steps": [
-        "step_0.json",
-        "step_1.json",
-        "step_2.json"
       ]
     }
   ]
