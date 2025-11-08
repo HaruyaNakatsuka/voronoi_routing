@@ -1,16 +1,14 @@
 # 🚚 Voronoi Routing: Vehicle Routing Optimization via Voronoi Decomposition
 
 このプロジェクトは、**Vehicle Routing Problem (VRP)** を複数の配送会社（LSP）間で分割し、  
-**Voronoi 分割 + 社内限定 Genetic Algorithm-based Transportation (GAT)** による経路改善を行う Python 実装です。
-
-大阪大学 情報科学研究科 Masuzawa Laboratory における研究の一環として開発されています。
+**Voronoi 分割 + 社内限定 Genetic Algorithm-based Transportation (GAT)** による経路改善を行う Python 実装。
 
 ---
 
 ## 🧩 概要
 
 複数の配送会社がそれぞれ顧客を担当する VRP インスタンスを、幾何的な **Voronoi 分割** によって自動的に分割し、  
-さらに各会社内部で GAT による経路改善を繰り返し実施します。
+さらに各会社内部で GAT による経路改善を繰り返し実施する。
 
 全体の流れ：
 
@@ -50,8 +48,6 @@ voronoi_routing/
 ---
 
 ### 🔹 GAT（Genetic Algorithm-based Transportation）
-
-各社独立に実行される遺伝的アルゴリズムベースの経路改善手法です。
 
 **基本アイデア**
 - 各会社内でのみ遺伝的操作（交換・突然変異など）を許可  
