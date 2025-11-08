@@ -119,6 +119,20 @@ export default function App() {
       });
   }, [selectedCase, selectedStep]);
 
+  // --- 追加: Step 前後移動ハンドラ（最小変更） ---
+  const currentStepIndex = stepList.findIndex((s) => s === selectedStep);
+  const hasPrev = currentStepIndex > 0;
+  const hasNext = currentStepIndex >= 0 && currentStepIndex < stepList.length - 1;
+
+  const goPrevStep = () => {
+    if (!hasPrev) return;
+    setSelectedStep(stepList[currentStepIndex - 1]);
+  };
+  const goNextStep = () => {
+    if (!hasNext) return;
+    setSelectedStep(stepList[currentStepIndex + 1]);
+  };
+
   // --- ノード情報を横並びのチップで表示する部品 ---
   const NodeInfoChips = ({ info }) => {
     // 1行固定・横スクロールで押し下げを防止
@@ -140,7 +154,7 @@ export default function App() {
       borderRadius: 999,
       background: "#fff",
       fontSize: 13,
-      maxWidth: 260,               // 1チップの最大幅（長いテキストに備え）
+      maxWidth: 260,
       textOverflow: "ellipsis",
       overflow: "hidden",
     };
@@ -184,7 +198,7 @@ export default function App() {
           alignItems: "center",
           justifyContent: "space-between",
           gap: 16,
-          flexWrap: "nowrap",     // 1行固定で折り返さない
+          flexWrap: "nowrap",
         }}
       >
         <h1 style={{ margin: 0, lineHeight: "56px" }}>VRP Route Viewer</h1>
@@ -193,12 +207,12 @@ export default function App() {
         <div
           style={{
             minWidth: 360,
-            maxWidth: "50vw",           // タイトルとバランスよく
+            maxWidth: "50vw",
             border: "1px solid #ccc",
             borderRadius: 10,
             background: "#f9f9f9",
             padding: "4px 8px",
-            height: 56,                 // ヘッダー高さに合わせる（押し下げ防止）
+            height: 56,
             boxSizing: "border-box",
           }}
         >
@@ -207,7 +221,7 @@ export default function App() {
       </div>
 
       {/* セレクタ行 */}
-      <div style={{ margin: "12px 0" }}>
+      <div style={{ margin: "12px 0", display: "flex", alignItems: "center", gap: 8 }}>
         <label style={{ marginRight: 8 }}>Case:</label>
         <select value={selectedCase || ""} onChange={(e) => setSelectedCase(e.target.value)}>
           {caseList.map((c, idx) => (
@@ -216,11 +230,33 @@ export default function App() {
         </select>
 
         <label style={{ marginLeft: 16, marginRight: 8 }}>Step:</label>
+
+        {/* 追加: 前へボタン */}
+        <button
+          onClick={goPrevStep}
+          disabled={!hasPrev}
+          title="前のステップへ"
+          style={{ padding: "4px 8px" }}
+        >
+          ◀
+        </button>
+
+        {/* 既存のプルダウン */}
         <select value={selectedStep || ""} onChange={(e) => setSelectedStep(e.target.value)}>
           {stepList.map((s, idx) => (
             <option key={`${s}-${idx}`} value={s}>{s}</option>
           ))}
         </select>
+
+        {/* 追加: 次へボタン */}
+        <button
+          onClick={goNextStep}
+          disabled={!hasNext}
+          title="次のステップへ"
+          style={{ padding: "4px 8px" }}
+        >
+          ▶
+        </button>
       </div>
 
       {/* ビューア領域：残り高さすべて */}
