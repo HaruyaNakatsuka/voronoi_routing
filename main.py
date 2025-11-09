@@ -11,6 +11,12 @@ import logging
 from tabulate import tabulate
 
 
+# ============ 出力ON/OFFフラグ（環境変数でも制御可。未設定ならON） =========================
+ENABLE_EXPORT = os.getenv("VRP_ENABLE_EXPORT", "1") == "1"  # JSON出力(export_vrp_state)
+ENABLE_PLOT   = os.getenv("VRP_ENABLE_PLOT",   "1") == "1"  # PNG出力(plot_routes)
+# =======================================================================================
+
+
 def setup_logging(show_progress: bool = True):
     logging.basicConfig(
         level=logging.INFO if show_progress else logging.WARNING,
@@ -133,9 +139,11 @@ for case_index, (file_paths, offsets) in enumerate(test_cases, 1):
         print(f"LSP {idx}: {c:.2f}")
     print(f"TOTAL: {initial_total_cost:.2f}")
     # [データ保存] -> jsonファイル、pngファイル
-    export_vrp_state(all_customers, routes, all_PD_pairs, 0, case_index=case_index,depot_id_list=depot_id_list,
+    if ENABLE_EXPORT:
+        export_vrp_state(all_customers, routes, all_PD_pairs, 0, case_index=case_index,depot_id_list=depot_id_list,
                     vehicle_num_list=vehicle_num_list,instance_name=instance_name, output_root="web_data")
-    plot_routes(all_customers, routes, depot_id_list, vehicle_num_list, iteration=0, instance_name=instance_name)
+    if ENABLE_PLOT:
+        plot_routes(all_customers, routes, depot_id_list, vehicle_num_list, iteration=0, instance_name=instance_name)
 
 
     # ==========================================
@@ -177,10 +185,12 @@ for case_index, (file_paths, offsets) in enumerate(test_cases, 1):
         )
     )
     # [データ保存] -> jsonファイル、pngファイル
-    export_vrp_state(all_customers, voronoi_routes, all_PD_pairs, 1, case_index=case_index,
+    if ENABLE_EXPORT:
+        export_vrp_state(all_customers, voronoi_routes, all_PD_pairs, 1, case_index=case_index,
                      depot_id_list=depot_id_list, vehicle_num_list=vehicle_num_list,
                      instance_name=instance_name, output_root="web_data")
-    plot_routes(all_customers, voronoi_routes, depot_id_list, vehicle_num_list, iteration=1, instance_name=instance_name)
+    if ENABLE_PLOT:
+        plot_routes(all_customers, voronoi_routes, depot_id_list, vehicle_num_list, iteration=1, instance_name=instance_name)
 
     # =======================================================
     # === 社内限定の GAT 改善（会社ごとに独立に繰り返し） ===
@@ -273,19 +283,21 @@ for case_index, (file_paths, offsets) in enumerate(test_cases, 1):
         )
 
         # [データ保存] -> jsonファイル、pngファイル
-        export_vrp_state(all_customers, gat_current_routes, all_PD_pairs, step_idx,case_index=case_index,
+        if ENABLE_EXPORT:
+            export_vrp_state(all_customers, gat_current_routes, all_PD_pairs, step_idx,case_index=case_index,
                          depot_id_list=depot_id_list, vehicle_num_list=vehicle_num_list,instance_name=instance_name, output_root="web_data")
-        plot_routes(all_customers, gat_current_routes, depot_id_list, vehicle_num_list,iteration=step_idx, instance_name=instance_name)
+        if ENABLE_PLOT:
+            plot_routes(all_customers, gat_current_routes, depot_id_list, vehicle_num_list,iteration=step_idx, instance_name=instance_name)
 
         # 次のラウンドへ
         gat_round += 1
         step_idx += 1
 
     print("\n>>> 全社が収束（改善率=0%）したため、社内GATを終了")
-    gat_final_routes = gat_current_routes
 
-    # React側へ今回のインスタンスだけ反映
-    generate_index_json(instance_name=instance_name, output_root="web_data", target_root="vrp-viewer/public/vrp_data")
+    #  [データ保存] -> jsonファイル
+    if ENABLE_EXPORT:
+        generate_index_json(instance_name=instance_name, output_root="web_data", target_root="vrp-viewer/public/vrp_data")
 
     # 実行時間
     elapsed = time.time() - start_time
