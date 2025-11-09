@@ -58,9 +58,6 @@ def rank_pd_pairs_by_midpoint_to_voronoi_boundary(all_customers, PD_pairs, depot
     # デポの座標リスト
     depot_xy = [(d, id2xy[d]) for d in depot_id_list]
 
-    def dist(a, b):
-        return math.hypot(a[0] - b[0], a[1] - b[1])
-
     boundary_dist_ranked_PDpairs = []
     for pu, de in PD_pairs.items():
         if pu not in id2xy or de not in id2xy:
@@ -278,7 +275,7 @@ for case_index, (file_paths, offsets) in enumerate(test_cases, 1):
     # =============== 段階的なタスク再交換===============
     # =======================================================
     id2cust = {c["id"]: c for c in all_customers}
-    #depot_coords = {dep_id: (id2cust[dep_id]["x"], id2cust[dep_id]["y"]) for dep_id in depot_id_list}
+    depot_coords = {dep_id: (id2cust[dep_id]["x"], id2cust[dep_id]["y"]) for dep_id in depot_id_list}
 
     def nearest_and_second_depot_company_of_midpoint(pick_id, deliv_id):
         """PD中点からの距離で最寄り/次点デポの会社 index を返す"""
@@ -318,16 +315,16 @@ for case_index, (file_paths, offsets) in enumerate(test_cases, 1):
         prev_company_costs = current_company_costs
         prev_total_cost = current_total_cost
         
-        # 改善率>0の会社を抽出
-        improving_companies = [i for i, r in enumerate(cost_reduction_rates) if r > 0]
+        # 改善率がマイナスの会社を抽出
+        worsening_companies = [i for i, r in enumerate(cost_reduction_rates) if r < 0]
 
         # ランキング作成の是非と対象データを決定
-        if len(improving_companies) == len(vehicle_num_list):
+        if len(worsening_companies) == len(vehicle_num_list):
             break
         else:
             per_company_routes = split_routes_by_company(routes, vehicle_num_list)
             eligible_node_ids = set()
-            for comp_idx in improving_companies:
+            for comp_idx in worsening_companies:
                 for r in per_company_routes[comp_idx]:
                     eligible_node_ids.update(r)
 
@@ -337,11 +334,10 @@ for case_index, (file_paths, offsets) in enumerate(test_cases, 1):
                                 if p in eligible_node_ids and d in eligible_node_ids}
 
             # ランキングを作成
-            ranked = rank_pd_pairs_by_midpoint_to_voronoi_boundary(eligible_customers, eligible_PD_pairs, depot_id_list)
-
+            ranked = rank_pd_pairs_by_midpoint_to_voronoi_boundary(all_customers, eligible_PD_pairs, depot_id_list)
 
         # 今回の対象 PD を決定
-        pick_id, deliv_id = ranked[0][0], ranked[0][1]
+        pick_id, deliv_id = ranked[0]["pickup"], ranked[0]["delivery"]
         pd_nodes = {pick_id, deliv_id}
 
         # 現担当会社 & 転送先会社
@@ -381,7 +377,7 @@ for case_index, (file_paths, offsets) in enumerate(test_cases, 1):
             company_route = solve_vrp_flexible(
                 sub_customers,
                 initial_routes,
-                sub_PD_pairs,
+                sub_PD_pairs.items(),
                 vehicle_num_list[comp_idx],
                 vehicle_capacity,
                 start_depots,
