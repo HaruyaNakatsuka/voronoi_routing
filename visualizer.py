@@ -151,9 +151,10 @@ def plot_routes(customers, routes, depot_id_list, vehicle_num_list, iteration, i
             base_voro = voro_metrics["company"][i-1] if voro_metrics else None
             base_init = init_metrics["company"][i-1] if init_metrics else None
             lines.append(f"    LSP {i}: {fmt(c)}   改善(ラウンド比): {pct(base_prev, c)}   改善(ボロノイ比): {pct(base_voro, c)}   改善(初期比): {pct(base_init, c)}")
-        base_total_v = voro_metrics["total"] if voro_metrics else None
-        base_total_i = init_metrics["total"] if init_metrics else None
-        lines.append(f"    TOTAL: {fmt(curr_total)}   改善(ボロノイ比): {pct(base_total_v, curr_total)}   改善(初期比): {pct(base_total_i, curr_total)}")
+        base_total_prev = prev_metrics["total"] if prev_metrics else None
+        base_total_voro = voro_metrics["total"] if voro_metrics else None
+        base_total_init = init_metrics["total"] if init_metrics else None
+        lines.append(f"    TOTAL: {fmt(curr_total)}   改善(ラウンド比): {pct(base_total_prev, curr_total)}   改善(ボロノイ比): {pct(base_total_voro, curr_total)}   改善(初期比): {pct(base_total_init, curr_total)}")
 
     # ====== ★ここを変更：下部フッターに表示 ======
     if lines:
