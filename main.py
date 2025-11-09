@@ -150,17 +150,20 @@ for case_index, (file_paths, offsets) in enumerate(test_cases, 1):
     # === Voronoi再配布 → 各社で一発最適化 ===
     # ==========================================
     print("\n=== Voronoi分割による経路再生成 ===")
-    voronoi_routes = perform_voronoi_routing(
+    routes = perform_voronoi_routing(
         customers=all_customers,
         PD_pairs=all_PD_pairs,
         depot_id_list=depot_id_list,
         vehicle_num_list=vehicle_num_list,
         vehicle_capacity=vehicle_capacity
     )
+    current_company_costs = compute_company_costs(routes, all_customers, vehicle_num_list)
+    current_total_cost = sum(current_company_costs)
+    cost_reduction_rates = [((init_c - cur_c) / init_c * 100.0) for init_c, cur_c 
+                                    in zip(initial_company_costs, current_company_costs)]
+    total_cost_reduction_rates = ((initial_total_cost - current_total_cost) / initial_total_cost * 100.0)
 
     #　[コンソール出力] -> 改善率、他
-    voronoi_company_costs = compute_company_costs(voronoi_routes, all_customers, vehicle_num_list)
-    voronoi_total_cost = sum(voronoi_company_costs)
     colw = 10
     print(
         " " * 7 +
@@ -169,28 +172,29 @@ for case_index, (file_paths, offsets) in enumerate(test_cases, 1):
         )
     )
     colw = 15
-    for idx, (init_c, cur_c) in enumerate(zip(initial_company_costs, voronoi_company_costs), 1):
-        init_improve = ((init_c - cur_c) / init_c * 100.0) if init_c > 0 else 0.0
+    for idx, (init_c, cur_c, init_improve) in enumerate(
+        zip(initial_company_costs, current_company_costs, cost_reduction_rates), 1
+    ):
         print(
             f"LSP {idx:<2} " +
             "{:>{w}.2f} {:>{w}.2f} {:>{w}.2f}".format(
                 init_c, cur_c, init_improve, w=colw
             )
         )
-    init_improve_total = ((initial_total_cost - voronoi_total_cost) / initial_total_cost * 100.0) if initial_total_cost > 0 else 0.0
     print(
         f"{'TOTAL':<6} " +
         "{:>{w}.2f} {:>{w}.2f} {:>{w}.2f}".format(
-            initial_total_cost, voronoi_total_cost, init_improve_total, w=colw
+            initial_total_cost, current_total_cost, total_cost_reduction_rates, w=colw
         )
     )
+    
     # [データ保存] -> jsonファイル、pngファイル
     if ENABLE_EXPORT:
-        export_vrp_state(all_customers, voronoi_routes, all_PD_pairs, 1, case_index=case_index,
+        export_vrp_state(all_customers, routes, all_PD_pairs, 1, case_index=case_index,
                      depot_id_list=depot_id_list, vehicle_num_list=vehicle_num_list,
                      instance_name=instance_name, output_root="web_data")
     if ENABLE_PLOT:
-        plot_routes(all_customers, voronoi_routes, depot_id_list, vehicle_num_list, iteration=1, instance_name=instance_name)
+        plot_routes(all_customers, routes, depot_id_list, vehicle_num_list, iteration=1, instance_name=instance_name)
 
     # =======================================================
     # === 社内限定の GAT 改善（会社ごとに独立に繰り返し） ===
@@ -200,7 +204,7 @@ for case_index, (file_paths, offsets) in enumerate(test_cases, 1):
     num_companies = len(vehicle_num_list)
     converged = [False] * num_companies          # 会社ごとの収束フラグ
     gat_round = 1
-    gat_current_routes = voronoi_routes[:]       # 作業用コピー
+    gat_current_routes = routes[:]       # 作業用コピー
     step_idx = 2                                 # 0=初期, 1=ボロノイ, 以降はGATラウンド
 
     while not all(converged):
@@ -274,11 +278,11 @@ for case_index, (file_paths, offsets) in enumerate(test_cases, 1):
             )
         # TOTAL行
         round_improve_total = ((prev_total_cost - curr_total_cost) / prev_total_cost * 100.0) if prev_total_cost > 0 else 0.0
-        init_improve_total = ((initial_total_cost - curr_total_cost) / initial_total_cost * 100.0) if initial_total_cost > 0 else 0.0
+        total_cost_reduction_rates = ((initial_total_cost - curr_total_cost) / initial_total_cost * 100.0) if initial_total_cost > 0 else 0.0
         print(
             f"{'TOTAL':<6} " +
             "{:>{w}.2f} {:>{w}.2f} {:>{w}.2f} {:>{w}.2f}".format(
-                initial_total_cost, curr_total_cost, round_improve_total, init_improve_total, w=colw
+                initial_total_cost, curr_total_cost, round_improve_total, total_cost_reduction_rates, w=colw
             )
         )
 
