@@ -126,8 +126,6 @@ def plot_routes(customers, routes, depot_id_list, vehicle_num_list, iteration, i
 
     # ====== メトリクス計算 ======
     curr_company, curr_total = company_costs(routes, id_to_coord, vehicle_num_list)
-    init_metrics = load_step_routes(0)
-    voro_metrics = load_step_routes(1)
 
     lines = []
     if iteration == 0:
@@ -137,6 +135,7 @@ def plot_routes(customers, routes, depot_id_list, vehicle_num_list, iteration, i
         lines.append(f"  TOTAL: {fmt(curr_total)}")
     elif iteration == 1:
         lines.append("【ボロノイ分割後】")
+        init_metrics = load_step_routes(0)
         for i, c in enumerate(curr_company, 1):
             base = init_metrics["company"][i-1] if init_metrics else None
             lines.append(f"  LSP {i}: {fmt(c)}   改善(初期比): {pct(base, c)}")
@@ -144,10 +143,14 @@ def plot_routes(customers, routes, depot_id_list, vehicle_num_list, iteration, i
         lines.append(f"  TOTAL: {fmt(curr_total)}   改善(初期比): {pct(base_total, curr_total)}")
     else:
         lines.append(f"【自社内GAT{iteration}回目】")
+        init_metrics = load_step_routes(0)
+        voro_metrics = load_step_routes(1)
+        prev_metrics = load_step_routes(iteration-1)
         for i, c in enumerate(curr_company, 1):
-            base_v = voro_metrics["company"][i-1] if voro_metrics else None
-            base_i = init_metrics["company"][i-1] if init_metrics else None
-            lines.append(f"    LSP {i}: {fmt(c)}   改善(ボロノイ比): {pct(base_v, c)}   改善(初期比): {pct(base_i, c)}")
+            base_prev = prev_metrics["company"][i-1] if prev_metrics else None
+            base_voro = voro_metrics["company"][i-1] if voro_metrics else None
+            base_init = init_metrics["company"][i-1] if init_metrics else None
+            lines.append(f"    LSP {i}: {fmt(c)}   改善(ラウンド比): {pct(base_prev, c)}   改善(ボロノイ比): {pct(base_voro, c)}   改善(初期比): {pct(base_init, c)}")
         base_total_v = voro_metrics["total"] if voro_metrics else None
         base_total_i = init_metrics["total"] if init_metrics else None
         lines.append(f"    TOTAL: {fmt(curr_total)}   改善(ボロノイ比): {pct(base_total_v, curr_total)}   改善(初期比): {pct(base_total_i, curr_total)}")
