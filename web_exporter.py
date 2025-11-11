@@ -1,5 +1,6 @@
 import os
 import json
+import re
 import glob
 import shutil
 import logging
@@ -121,10 +122,15 @@ def generate_index_json(instance_name: str,
     # 4) index.cases から同名インスタンスを削除
     cases = [c for c in index_data.get("cases", []) if not (isinstance(c, dict) and c.get("name") == instance_name)]
 
-    # 5) コピー先のファイルから steps を作成（step_*.json を名前順ソート）
-    steps = sorted([os.path.basename(p)
-                    for p in glob.glob(os.path.join(dst_case_dir, "step_*.json"))])
+    # 5) コピー先のファイルから steps を作成（数値でソート）
+    step_paths = glob.glob(os.path.join(dst_case_dir, "step_*.json"))
 
+    def step_num(fname: str) -> int:
+        m = re.search(r"step_(\d+)\.json$", os.path.basename(fname))
+        return int(m.group(1)) if m else 10**9   # マッチしない場合は末尾へ
+
+    steps = [os.path.basename(p) for p in sorted(step_paths, key=step_num)]
+    
     # 6) 新しいエントリを追加
     cases.append({"name": instance_name, "steps": steps})
 
