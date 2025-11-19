@@ -44,7 +44,7 @@ def initialize_individual_vrps(customers, pickup_to_delivery, num_lsps, vehicle_
             use_capacity=True,
             use_time=True,
             use_pickup_delivery=True,
-            isGAT=False
+            InitialRoute=False
         )
 
         all_vehicle_routes.extend(lsp_routes)

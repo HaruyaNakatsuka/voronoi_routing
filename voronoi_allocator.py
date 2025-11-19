@@ -100,7 +100,7 @@ def perform_voronoi_routing(
             use_capacity=True,
             use_time=True,
             use_pickup_delivery=True,
-            isGAT=False
+            InitialRoute=False
         )
         if routes is None:
             print(f"⚠️ LSP {comp_idx+1}: 解が見つからなかったため空ルートを採用")

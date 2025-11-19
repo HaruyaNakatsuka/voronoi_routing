@@ -1,4 +1,4 @@
-from parser import parse_lilim200
+from parser import parse_lilim200, customers_to_lilim200_text
 from flexible_vrp_solver import solve_vrp_flexible, route_cost
 from gat import initialize_individual_vrps, perform_gat_exchange  # 初期解生成/GAT社内最適化で流用
 from visualizer import plot_routes
@@ -146,6 +146,7 @@ def find_company_owning_pd_pair(routes_all, vehicle_num_list, pd_nodes):
 # ==============================
 # === テストケースの定義部 ===
 # ==============================
+"""
 test_cases = [
     (["data/LC1_2_2.txt", "data/LC1_2_6.txt"], [(0, 0), (42, -42)]),
     (["data/LC1_2_2.txt", "data/LC1_2_7.txt"], [(0, 0), (-32, -32)]),
@@ -158,6 +159,12 @@ test_cases = [
     (["data/LR1_2_10.txt", "data/LR1_2_3.txt"], [(0, 0), (0, -30)]),
     (["data/LR1_2_10.txt", "data/LR1_2_8.txt"], [(0, 0), (0, 30)])
 ]
+"""
+
+test_cases = [
+    (["data/LC1_2_2.txt", "data/LC1_2_6.txt"], [(0, 0), (42, -42)])
+]
+
 
 
 # ==============================
@@ -374,6 +381,60 @@ for case_index, (file_paths, offsets) in enumerate(test_cases, 1):
             initial_routes = None
             start_depots = [depot_id_list[comp_idx]] * vehicle_num_list[comp_idx]
             end_depots   = [depot_id_list[comp_idx]] * vehicle_num_list[comp_idx]
+                
+            """
+            # --- 会社ごとに VRP を解く前に LILIM200形式で保存 ---
+            lilim_text = customers_to_lilim200_text(
+                sub_customers=sub_customers,
+                sub_PD_pairs=sub_PD_pairs,
+                n_vehicles=vehicle_num_list[comp_idx],
+                vehicle_capacity=vehicle_capacity
+            )
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+            output_dir = os.path.join(script_dir, "converted_txt")
+            os.makedirs(output_dir, exist_ok=True)
+            out_txt = os.path.join(output_dir, f"{instance_name}.Cus.com{comp_idx}_iter{iteration+1}.txt")
+            if os.path.exists(out_txt):
+                os.remove(out_txt)
+            with open(out_txt, "w", encoding="utf-8") as f:
+                f.write(lilim_text)
+            # --- sub_PD_pairs の内容も保存（構造そのまま） ---
+            pd_pairs_path = os.path.join(output_dir, f"{instance_name}.PD.com{comp_idx}_iter{iteration+1}.txt")
+            # 既存ファイルがあれば削除
+            if os.path.exists(pd_pairs_path):
+                os.remove(pd_pairs_path)
+            # 辞書の内容をシンプルに書き出し
+            with open(pd_pairs_path, "w", encoding="utf-8") as f:
+                f.write("pickup_id → delivery_id\n")
+                f.write("-" * 30 + "\n")
+                for p, d in sub_PD_pairs.items():
+                    f.write(f"{p} → {d}\n")
+            """
+            initial_routes = [r[1:-1] for r in company_routes]
+            if comp_idx == current_owner:
+                # 現担当 → ルートから pick_id/deliv_id を削除
+                for rt in initial_routes:
+                    try:
+                        rt.remove(pick_id)
+                    except ValueError:
+                        pass
+                    try:
+                        rt.remove(deliv_id)
+                    except ValueError:
+                        pass
+            elif comp_idx == target_owner:
+                # 転送先 → pick_id / deliv_id を追加
+                added = False
+                # 1) 空ルートを探して追加
+                for rt in initial_routes:
+                    if len(rt) == 0:
+                        rt.extend([pick_id, deliv_id])
+                        added = True
+                        break
+                # 2) 空ルートが無かった場合、先頭ルートに追加
+                if not added:
+                    initial_routes[0].extend([pick_id, deliv_id])
+            
             company_route = solve_vrp_flexible(
                 sub_customers,
                 initial_routes,
@@ -385,7 +446,7 @@ for case_index, (file_paths, offsets) in enumerate(test_cases, 1):
                 use_capacity=True,
                 use_time=True,
                 use_pickup_delivery=True,
-                isGAT=False
+                InitialRoute=True
             )
             new_per_company_routes.append(company_route)
 
