@@ -146,7 +146,7 @@ def find_company_owning_pd_pair(routes_all, vehicle_num_list, pd_nodes):
 # ==============================
 # === テストケースの定義部 ===
 # ==============================
-"""
+
 test_cases = [
     (["data/LC1_2_2.txt", "data/LC1_2_6.txt"], [(0, 0), (42, -42)]),
     (["data/LC1_2_2.txt", "data/LC1_2_7.txt"], [(0, 0), (-32, -32)]),
@@ -158,11 +158,6 @@ test_cases = [
     (["data/LR1_2_8.txt", "data/LR1_2_9.txt"], [(0, 0), (0, -30)]),
     (["data/LR1_2_10.txt", "data/LR1_2_3.txt"], [(0, 0), (0, -30)]),
     (["data/LR1_2_10.txt", "data/LR1_2_8.txt"], [(0, 0), (0, 30)])
-]
-"""
-
-test_cases = [
-    (["data/LC1_2_2.txt", "data/LC1_2_6.txt"], [(0, 0), (42, -42)])
 ]
 
 
@@ -410,31 +405,6 @@ for case_index, (file_paths, offsets) in enumerate(test_cases, 1):
                 for p, d in sub_PD_pairs.items():
                     f.write(f"{p} → {d}\n")
             """
-            initial_routes = [r[1:-1] for r in company_routes]
-            if comp_idx == current_owner:
-                # 現担当 → ルートから pick_id/deliv_id を削除
-                for rt in initial_routes:
-                    try:
-                        rt.remove(pick_id)
-                    except ValueError:
-                        pass
-                    try:
-                        rt.remove(deliv_id)
-                    except ValueError:
-                        pass
-            elif comp_idx == target_owner:
-                # 転送先 → pick_id / deliv_id を追加
-                added = False
-                # 1) 空ルートを探して追加
-                for rt in initial_routes:
-                    if len(rt) == 0:
-                        rt.extend([pick_id, deliv_id])
-                        added = True
-                        break
-                # 2) 空ルートが無かった場合、先頭ルートに追加
-                if not added:
-                    initial_routes[0].extend([pick_id, deliv_id])
-            
             company_route = solve_vrp_flexible(
                 sub_customers,
                 initial_routes,
@@ -445,8 +415,7 @@ for case_index, (file_paths, offsets) in enumerate(test_cases, 1):
                 end_depots,
                 use_capacity=True,
                 use_time=True,
-                use_pickup_delivery=True,
-                InitialRoute=True
+                use_pickup_delivery=True
             )
             new_per_company_routes.append(company_route)
 
