@@ -3,7 +3,7 @@ from flexible_vrp_solver import solve_vrp_flexible, route_cost
 from gat import initialize_individual_vrps, perform_gat_exchange  # 初期解生成/GAT社内最適化で流用
 from visualizer import plot_routes
 from web_exporter import export_vrp_state, generate_index_json
-from voronoi_allocator import perform_voronoi_routing  # ボロノイ再配布＋各社VRP
+from voronoi_allocator import perform_voronoi_routing_with_initRoute
 import time
 import os
 from itertools import chain
@@ -146,7 +146,7 @@ def find_company_owning_pd_pair(routes_all, vehicle_num_list, pd_nodes):
 # ==============================
 # === テストケースの定義部 ===
 # ==============================
-"""
+
 test_cases = [
     (["data/LC1_2_2.txt", "data/LC1_2_6.txt"], [(0, 0), (42, -42)]),
     (["data/LC1_2_2.txt", "data/LC1_2_7.txt"], [(0, 0), (-32, -32)]),
@@ -159,12 +159,6 @@ test_cases = [
     (["data/LR1_2_10.txt", "data/LR1_2_3.txt"], [(0, 0), (0, -30)]),
     (["data/LR1_2_10.txt", "data/LR1_2_8.txt"], [(0, 0), (0, 30)])
 ]
-"""
-
-test_cases = [
-    (["data/LC1_2_2.txt", "data/LC1_2_6.txt"], [(0, 0), (42, -42)])
-]
-
 
 
 # ==============================
@@ -232,12 +226,13 @@ for case_index, (file_paths, offsets) in enumerate(test_cases, 1):
     # === Voronoi再配布 → 各社で一発最適化 ===
     # ==========================================
     print("\n=== Voronoi分割による経路再生成 ===")
-    routes = perform_voronoi_routing(
+    routes = perform_voronoi_routing_with_initRoute(
         customers=all_customers,
         PD_pairs=all_PD_pairs,
         depot_id_list=depot_id_list,
         vehicle_num_list=vehicle_num_list,
-        vehicle_capacity=vehicle_capacity
+        vehicle_capacity=vehicle_capacity,
+        original_routes=routes
     )
     current_company_costs = compute_company_costs(routes, all_customers, vehicle_num_list)
     current_total_cost = sum(current_company_costs)
