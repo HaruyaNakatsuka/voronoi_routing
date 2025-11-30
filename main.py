@@ -8,7 +8,6 @@ import time
 import os
 from itertools import chain
 import logging
-from tabulate import tabulate
 
 
 # ============ 出力ON/OFFフラグ（環境変数でも制御可。未設定ならON） =========================
