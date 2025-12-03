@@ -106,9 +106,6 @@ def split_routes_by_company(routes, vehicle_num_list):
     return out
 
 
-def flatten(list_of_lists):
-    return list(chain.from_iterable(list_of_lists))
-
 
 def filter_subcustomers_by_routes(all_customers, company_routes):
     """その会社のルートに登場するノードのみを抽出して customers を縮約"""
@@ -419,7 +416,7 @@ for case_index, (file_paths, offsets) in enumerate(test_cases, 1):
             new_per_company_routes.append(company_route)
 
         # 全体ルートを連結して更新
-        routes = flatten(new_per_company_routes)
+        routes = list(chain.from_iterable(new_per_company_routes))
 
         # 改善率の更新
         current_company_costs = compute_company_costs(routes, all_customers, vehicle_num_list)
