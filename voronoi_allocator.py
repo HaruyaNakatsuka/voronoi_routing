@@ -179,6 +179,7 @@ def perform_voronoi_routing_onlyMovedPD(
             use_capacity=True,
             use_time=True,
             use_pickup_delivery=True,
+            InitialRoute=False
         )
 
         if new_routes is None:
