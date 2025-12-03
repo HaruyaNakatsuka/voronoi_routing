@@ -1,14 +1,13 @@
 from parser import parse_lilim200, customers_to_lilim200_text
 from flexible_vrp_solver import solve_vrp_flexible, route_cost
-from gat import initialize_individual_vrps, perform_gat_exchange  # 初期解生成/GAT社内最適化で流用
+from gat import initialize_individual_vrps
 from visualizer import plot_routes
 from web_exporter import export_vrp_state, generate_index_json
-from voronoi_allocator import perform_voronoi_routing_with_initRoute
+from voronoi_allocator import perform_voronoi_routing_all
 import time
 import os
 from itertools import chain
 import logging
-from tabulate import tabulate
 
 
 # ============ 出力ON/OFFフラグ（環境変数でも制御可。未設定ならON） =========================
@@ -226,7 +225,7 @@ for case_index, (file_paths, offsets) in enumerate(test_cases, 1):
     # === Voronoi再配布 → 各社で一発最適化 ===
     # ==========================================
     print("\n=== Voronoi分割による経路再生成 ===")
-    routes = perform_voronoi_routing_with_initRoute(
+    routes = perform_voronoi_routing_all(
         customers=all_customers,
         PD_pairs=all_PD_pairs,
         depot_id_list=depot_id_list,
