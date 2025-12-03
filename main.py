@@ -106,10 +106,6 @@ def split_routes_by_company(routes, vehicle_num_list):
     return out
 
 
-def flatten(list_of_lists):
-    return list(chain.from_iterable(list_of_lists))
-
-
 def filter_subcustomers_by_routes(all_customers, company_routes):
     """その会社のルートに登場するノードのみを抽出して customers を縮約"""
     node_ids = set()
@@ -266,34 +262,43 @@ for case_index, (file_paths, offsets) in enumerate(test_cases, 1):
         plot_routes(all_customers, routes, depot_id_list, vehicle_num_list, iteration=1, instance_name=instance_name)
     
     # =======================================================
-    # =============== 段階的なタスク再交換===============
+    # =============== 段階的なタスク再交換（solver無し版）===============
     # =======================================================
     id2cust = {c["id"]: c for c in all_customers}
-    depot_coords = {dep_id: (id2cust[dep_id]["x"], id2cust[dep_id]["y"]) for dep_id in depot_id_list}
 
-    def nearest_and_second_depot_company_of_midpoint(pick_id, deliv_id):
-        """PD中点からの距離で最寄り/次点デポの会社 index を返す"""
-        px, py = id2cust[pick_id]["x"], id2cust[pick_id]["y"]
-        dx, dy = id2cust[deliv_id]["x"], id2cust[deliv_id]["y"]
-        mx, my = (px + dx) * 0.5, (py + dy) * 0.5
+    print("\n=== 等距離線付近のタスク交換による改善率平均化（solver無し） ===")
 
-        dist_with_comp = []
-        for comp_idx, dep_id in enumerate(depot_id_list):
-            x, y = depot_coords[dep_id]
-            d = ((mx - x) ** 2 + (my - y) ** 2) ** 0.5
-            dist_with_comp.append((d, comp_idx))
-        dist_with_comp.sort(key=lambda t: t[0])
-        near = dist_with_comp[0][1]
-        second = dist_with_comp[1][1] if len(dist_with_comp) > 1 else dist_with_comp[0][1]
-        return near, second
-    
-    print("\n=== 等距離線付近のタスク交換による改善率平均化 ===")
+    # --- 会社α/βを確定（α: 改善=正, β: 悪化=負） ---
+    alpha_companies = [i for i, r in enumerate(cost_reduction_rates) if r > 0]
+    beta_companies  = [i for i, r in enumerate(cost_reduction_rates) if r < 0]
+
+    # 2社想定（1つずつに定まる前提）
+    assert len(alpha_companies) == 1 and len(beta_companies) == 1, \
+        f"本仕様は α(改善) と β(悪化) が各1社ずつの前提です: alpha={alpha_companies}, beta={beta_companies}"
+
+    alpha_idx = alpha_companies[0]  # 移管先
+    beta_idx  = beta_companies[0]   # 移管元
+
+    # --- βが現時点で持っているPDペアのみ抽出してランキング ---
+    per_company_routes = split_routes_by_company(routes, vehicle_num_list)
+    beta_node_ids = set()
+    for r in per_company_routes[beta_idx]:
+        beta_node_ids.update(r)
+
+    beta_PD_pairs = {
+        p: d for p, d in all_PD_pairs.items()
+        if p in beta_node_ids and d in beta_node_ids
+    }
+
+    ranked_beta = rank_pd_pairs_by_midpoint_to_voronoi_boundary(all_customers, beta_PD_pairs, depot_id_list)
+    assert len(ranked_beta) > 0, "βのPDペアが空です（ランキング作成不可）"
+
     previous_cost_reduction_rates = None
     iteration = 0
     step_idx = 2
     while True:
         # --- 終了条件チェック ---
-        all_positive = all(rate > 0 for rate in cost_reduction_rates) #個別合理性が満たされている理想的状況
+        all_positive = all(rate > 0 for rate in cost_reduction_rates)
         all_negative = all(rate < 0 for rate in cost_reduction_rates)
         flipped_positive_to_negative = (
             previous_cost_reduction_rates is not None and
@@ -303,142 +308,71 @@ for case_index, (file_paths, offsets) in enumerate(test_cases, 1):
         if all_positive or all_negative or flipped_positive_to_negative:
             print(">>> 終了条件を満たしたためタスク交換終了")
             break
-        
+
+        # ランキングn番目を使用（0-based）
+        if iteration >= len(ranked_beta):
+            print(">>> βのランキングが尽きたため終了")
+            break
+
         print(f"--- ラウンド{iteration+1} ---")
         previous_cost_reduction_rates = cost_reduction_rates[:]
         prev_company_costs = current_company_costs
         prev_total_cost = current_total_cost
-        
-        # 改善率がマイナスの会社を抽出
-        worsening_companies = [i for i, r in enumerate(cost_reduction_rates) if r < 0]
 
-        # ランキング作成の是非と対象データを決定
-        if len(worsening_companies) == len(vehicle_num_list):
-            break
-        else:
-            per_company_routes = split_routes_by_company(routes, vehicle_num_list)
-            eligible_node_ids = set()
-            for comp_idx in worsening_companies:
-                for r in per_company_routes[comp_idx]:
-                    eligible_node_ids.update(r)
+        pick_id = ranked_beta[iteration]["pickup"]
+        deliv_id = ranked_beta[iteration]["delivery"]
 
-            # 対象 customers / PD を絞る
-            eligible_customers = [c for c in all_customers if c["id"] in eligible_node_ids]
-            eligible_PD_pairs = {p: d for p, d in all_PD_pairs.items()
-                                if p in eligible_node_ids and d in eligible_node_ids}
-
-            # ランキングを作成
-            ranked = rank_pd_pairs_by_midpoint_to_voronoi_boundary(all_customers, eligible_PD_pairs, depot_id_list)
-
-        # 今回の対象 PD を決定
-        pick_id, deliv_id = ranked[0]["pickup"], ranked[0]["delivery"]
-        pd_nodes = {pick_id, deliv_id}
-
-        # 現担当会社 & 転送先会社
-        current_owner = find_company_owning_pd_pair(routes, vehicle_num_list, pd_nodes)
-        nearest_company, second_company = nearest_and_second_depot_company_of_midpoint(pick_id, deliv_id)
-        target_owner = second_company
-
-        # 会社ごとに最適化
+        # --- routes を直接書き換えて PD を移管する ---
         per_company_routes = split_routes_by_company(routes, vehicle_num_list)
-        new_per_company_routes = []
-        for comp_idx, company_routes in enumerate(per_company_routes):
-            # 会社内ノード集合・顧客・PD を構築
-            sub_customers = filter_subcustomers_by_routes(all_customers, company_routes)
-            sub_node_ids = set(c["id"] for c in sub_customers)
-            sub_PD_pairs = filter_pd_pairs_for_nodes(all_PD_pairs, sub_node_ids)
 
-            # PD移管ロジック
-            if comp_idx == current_owner:
-                # 現担当：PD を除外
-                sub_customers = [c for c in sub_customers if c["id"] not in pd_nodes]
-                sub_node_ids.difference_update(pd_nodes)
-                sub_PD_pairs.pop(pick_id, None)  # PD 辞書キーは pickup 側
-            elif comp_idx == target_owner:
-                # 転送先：PD を追加
-                sub_customers.append(id2cust[pick_id])
-                sub_customers.append(id2cust[deliv_id])
-                sub_node_ids.add(pick_id)
-                sub_node_ids.add(deliv_id)
-                sub_PD_pairs[pick_id] = deliv_id
-            else:
-                pass
+        # 会社α：空車([depot,depot])に [depot,pick,deliv,depot] をセット
+        alpha_depot = depot_id_list[alpha_idx]
+        alpha_routes = per_company_routes[alpha_idx]
 
-            # --- 会社ごとに VRP を解く ---
-            initial_routes = None
-            start_depots = [depot_id_list[comp_idx]] * vehicle_num_list[comp_idx]
-            end_depots   = [depot_id_list[comp_idx]] * vehicle_num_list[comp_idx]
-                
-            """
-            # --- 会社ごとに VRP を解く前に LILIM200形式で保存 ---
-            lilim_text = customers_to_lilim200_text(
-                sub_customers=sub_customers,
-                sub_PD_pairs=sub_PD_pairs,
-                n_vehicles=vehicle_num_list[comp_idx],
-                vehicle_capacity=vehicle_capacity
-            )
-            script_dir = os.path.dirname(os.path.abspath(__file__))
-            output_dir = os.path.join(script_dir, "converted_txt")
-            os.makedirs(output_dir, exist_ok=True)
-            out_txt = os.path.join(output_dir, f"{instance_name}.Cus.com{comp_idx}_iter{iteration+1}.txt")
-            if os.path.exists(out_txt):
-                os.remove(out_txt)
-            with open(out_txt, "w", encoding="utf-8") as f:
-                f.write(lilim_text)
-            # --- sub_PD_pairs の内容も保存（構造そのまま） ---
-            pd_pairs_path = os.path.join(output_dir, f"{instance_name}.PD.com{comp_idx}_iter{iteration+1}.txt")
-            # 既存ファイルがあれば削除
-            if os.path.exists(pd_pairs_path):
-                os.remove(pd_pairs_path)
-            # 辞書の内容をシンプルに書き出し
-            with open(pd_pairs_path, "w", encoding="utf-8") as f:
-                f.write("pickup_id → delivery_id\n")
-                f.write("-" * 30 + "\n")
-                for p, d in sub_PD_pairs.items():
-                    f.write(f"{p} → {d}\n")
-            """
-            initial_routes = [r[1:-1] for r in company_routes]
-            if comp_idx == current_owner:
-                # 現担当 → ルートから pick_id/deliv_id を削除
-                for rt in initial_routes:
-                    try:
-                        rt.remove(pick_id)
-                    except ValueError:
-                        pass
-                    try:
-                        rt.remove(deliv_id)
-                    except ValueError:
-                        pass
-            elif comp_idx == target_owner:
-                # 転送先 → pick_id / deliv_id を追加
-                added = False
-                # 1) 空ルートを探して追加
-                for rt in initial_routes:
-                    if len(rt) == 0:
-                        rt.extend([pick_id, deliv_id])
-                        added = True
-                        break
-                # 2) 空ルートが無かった場合、先頭ルートに追加
-                if not added:
-                    initial_routes[0].extend([pick_id, deliv_id])
-            
-            company_route = solve_vrp_flexible(
-                sub_customers,
-                initial_routes,
-                sub_PD_pairs.items(),
-                vehicle_num_list[comp_idx],
-                vehicle_capacity,
-                start_depots,
-                end_depots,
-                use_capacity=True,
-                use_time=True,
-                use_pickup_delivery=True,
-                InitialRoute=True
-            )
-            new_per_company_routes.append(company_route)
+        empty_vehicle_pos = None
+        for vpos, r in enumerate(alpha_routes):
+            if r == [alpha_depot, alpha_depot]:
+                empty_vehicle_pos = vpos
+                break
 
-        # 全体ルートを連結して更新
-        routes = flatten(new_per_company_routes)
+        if empty_vehicle_pos is None:
+            raise RuntimeError(f"空車がありません（会社α=LSP{alpha_idx+1}）")
+
+        alpha_routes[empty_vehicle_pos] = [alpha_depot, pick_id, deliv_id, alpha_depot]
+
+        # 会社β：該当PDを担当している車両を見つけ、ノードを削除
+        beta_depot = depot_id_list[beta_idx]
+        beta_routes = per_company_routes[beta_idx]
+
+        found_vehicle = False
+        for vpos, r in enumerate(beta_routes):
+            # depot始終の経路の中に両方がいる前提
+            if pick_id in r and deliv_id in r:
+                # 人為的に削除（複数出現は想定しないが、安全に while で消す）
+                new_r = r[:]
+                while pick_id in new_r:
+                    new_r.remove(pick_id)
+                while deliv_id in new_r:
+                    new_r.remove(deliv_id)
+
+                # 形の整形（最低でも [depot,depot] にする）
+                if len(new_r) < 2:
+                    new_r = [beta_depot, beta_depot]
+                else:
+                    # 先頭末尾がデポであることは維持したい
+                    new_r[0] = beta_depot
+                    new_r[-1] = beta_depot
+
+                beta_routes[vpos] = new_r
+                found_vehicle = True
+                break
+
+        assert found_vehicle, f"β側に対象PDが見つかりません: (p={pick_id}, d={deliv_id})"
+
+        # per_company_routes を戻し、routes を更新
+        per_company_routes[alpha_idx] = alpha_routes
+        per_company_routes[beta_idx]  = beta_routes
+        routes = list(chain.from_iterable(per_company_routes))
 
         # 改善率の更新
         current_company_costs = compute_company_costs(routes, all_customers, vehicle_num_list)
@@ -477,8 +411,8 @@ for case_index, (file_paths, offsets) in enumerate(test_cases, 1):
         
         # [データ保存] -> jsonファイル、pngファイル
         if ENABLE_EXPORT:
-            export_vrp_state(all_customers, routes, all_PD_pairs, step_idx,case_index=case_index,
-                         depot_id_list=depot_id_list, vehicle_num_list=vehicle_num_list,instance_name=instance_name, output_root="web_data")
+            export_vrp_state(all_customers, routes, all_PD_pairs, step_idx, case_index=case_index,
+                            depot_id_list=depot_id_list, vehicle_num_list=vehicle_num_list,instance_name=instance_name, output_root="web_data")
         if ENABLE_PLOT:
             plot_routes(all_customers, routes, depot_id_list, vehicle_num_list,iteration=step_idx, instance_name=instance_name)
 
