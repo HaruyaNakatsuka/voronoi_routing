@@ -3,7 +3,7 @@ from flexible_vrp_solver import solve_vrp_flexible, route_cost
 from gat import initialize_individual_vrps, perform_gat_exchange
 from visualizer import plot_routes
 from web_exporter import export_vrp_state, generate_index_json
-from voronoi_allocator import perform_voronoi_routing_all, perform_voronoi_routing_onlyMovedPD
+from voronoi_allocator import perform_voronoi_routing_all
 import time
 import os
 from itertools import chain
@@ -223,7 +223,7 @@ for case_index, (file_paths, offsets) in enumerate(test_cases, 1):
     # === Voronoi再配布 → 各社で一発最適化 ===
     # ==========================================
     print("\n=== Voronoi分割による経路再生成 ===")
-    routes = perform_voronoi_routing_onlyMovedPD(routes, all_customers, all_PD_pairs, depot_id_list, vehicle_num_list, vehicle_capacity)
+    routes = perform_voronoi_routing_all(all_customers, all_PD_pairs, depot_id_list, vehicle_num_list, vehicle_capacity)
     
     current_company_costs = compute_company_costs(routes, all_customers, vehicle_num_list)
     current_total_cost = sum(current_company_costs)
