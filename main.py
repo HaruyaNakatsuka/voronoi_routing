@@ -162,14 +162,14 @@ test_cases = [
 # === テストケースの実行部 ===
 # ==============================
 for case_index, (file_paths, offsets) in enumerate(test_cases, 1):
+    start_time = time.time()
+    
     print("\n\n" + "="*60)
     print(f"テストケース {case_index}: {file_paths[0]} + {file_paths[1]}")
     print(f"オフセット: {offsets[0]} , {offsets[1]}")
     print("="*60)
 
     instance_name = f"{os.path.basename(file_paths[0]).split('.')[0]}_{os.path.basename(file_paths[1]).split('.')[0]}"
-    start_time = time.time()
-
     num_lsps = len(file_paths)
     num_vehicles = 0
     all_customers = []
@@ -201,7 +201,7 @@ for case_index, (file_paths, offsets) in enumerate(test_cases, 1):
     # === 初期：LSP個別の経路生成 ===
     # =============================
     routes = initialize_individual_vrps(
-        all_customers, all_PD_pairs, num_lsps, vehicle_num_list, depot_id_list, vehicle_capacity=vehicle_capacity
+        all_customers, all_PD_pairs, num_lsps, vehicle_num_list, depot_id_list, vehicle_capacity
     )
     
     #　[コンソール出力] -> 会社別コスト
@@ -223,13 +223,8 @@ for case_index, (file_paths, offsets) in enumerate(test_cases, 1):
     # === Voronoi再配布 → 各社で一発最適化 ===
     # ==========================================
     print("\n=== Voronoi分割による経路再生成 ===")
-    routes = perform_voronoi_routing(
-        customers=all_customers,
-        PD_pairs=all_PD_pairs,
-        depot_id_list=depot_id_list,
-        vehicle_num_list=vehicle_num_list,
-        vehicle_capacity=vehicle_capacity
-    )
+    routes = perform_voronoi_routing(all_customers, all_PD_pairs, depot_id_list, vehicle_num_list, vehicle_capacity)
+    
     current_company_costs = compute_company_costs(routes, all_customers, vehicle_num_list)
     current_total_cost = sum(current_company_costs)
     cost_reduction_rates = [((init_c - cur_c) / init_c * 100.0) for init_c, cur_c 
