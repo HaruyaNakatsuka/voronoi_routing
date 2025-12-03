@@ -170,8 +170,8 @@ def perform_voronoi_routing_onlyMovedPD(
 
         new_routes = solve_vrp_flexible(
             customers=sub_customers,
-            initial_routes=None,             # ★コールドスタート
-            PD_pairs=moved_pairs_for_company, # ★movedのみ
+            initial_routes=None,
+            PD_pairs=moved_pairs_for_company,
             num_vehicles=free_veh,
             vehicle_capacity=vehicle_capacity,
             start_depots=starts,
