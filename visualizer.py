@@ -83,7 +83,10 @@ def plot_routes(customers, routes, depot_id_list, vehicle_num_list, iteration, i
     elif iteration == 1:
         plt.title(f"{instance_name}：ボロノイ分割後")
     else:
-        plt.title(f"{instance_name} ：Iteration {iteration-1}")
+        if iteration%2 == 0:
+            plt.title(f"{instance_name} ：PDペア移管 {int(iteration/2)+1}組目")
+        else:
+            plt.title(f"{instance_name} ：GAT最適化実行後")
 
     # 経路描画
     vehicle_index = 0
@@ -140,7 +143,10 @@ def plot_routes(customers, routes, depot_id_list, vehicle_num_list, iteration, i
         base_total = init_metrics["total"] if init_metrics else None
         lines.append(f"  TOTAL: {fmt(curr_total)}   改善(初期比): {pct(base_total, curr_total)}")
     else:
-        lines.append(f"【等距離線付近のタスク交換{iteration-1}回目】")
+        if iteration%2 == 0:
+            plt.title(f"【ボロノイ境界付近のPD移管 {int(iteration/2)+1}組目】")
+        else:
+            plt.title(f"【GAT最適化実行後】")
         init_metrics = load_step_routes(0)
         voro_metrics = load_step_routes(1)
         prev_metrics = load_step_routes(iteration-1)

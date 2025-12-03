@@ -52,7 +52,7 @@ def initialize_individual_vrps(customers, pickup_to_delivery, num_lsps, vehicle_
     return all_vehicle_routes
 
 
-def perform_gat_exchange(original_routes, customers, PD_pairs, vehicle_capacity, vehicle_num_list):
+def perform_gat_exchange(original_routes, customers, PD_pairs, vehicle_capacity):
     """
     社内限定GAT：与えられた routes は単一会社ぶんのみを想定。
     - 2車両ペアごとに部分問題を解き、改善候補（アクション）を集める
