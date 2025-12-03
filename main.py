@@ -3,7 +3,7 @@ from flexible_vrp_solver import solve_vrp_flexible, route_cost
 from gat import initialize_individual_vrps, perform_gat_exchange
 from visualizer import plot_routes
 from web_exporter import export_vrp_state, generate_index_json
-from voronoi_allocator import perform_voronoi_routing_all, perform_voronoi_routing_onlyMovedPD
+from voronoi_allocator import perform_voronoi_routing_onlyMovedPD
 import time
 import os
 from itertools import chain
