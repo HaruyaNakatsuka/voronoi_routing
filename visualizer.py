@@ -82,8 +82,10 @@ def plot_routes(customers, routes, depot_id_list, vehicle_num_list, iteration, i
         plt.title(f"{instance_name}：初期解")
     elif iteration == 1:
         plt.title(f"{instance_name}：ボロノイ分割後")
+    elif iteration == 2:
+        plt.title(f"{instance_name}：GAT最適化実行後")
     else:
-        if iteration%2 == 0:
+        if iteration%2 == 1:
             plt.title(f"{instance_name} ：PDペア移管 {int(iteration/2)+1}組目")
         else:
             plt.title(f"{instance_name} ：GAT最適化実行後")
@@ -134,8 +136,11 @@ def plot_routes(customers, routes, depot_id_list, vehicle_num_list, iteration, i
         for i, c in enumerate(curr_company, 1):
             lines.append(f"  LSP {i}: {fmt(c)}")
         lines.append(f"  TOTAL: {fmt(curr_total)}")
-    elif iteration == 1:
-        lines.append("【ボロノイ分割後】")
+    elif iteration == 1 or 2:
+        if iteration == 1:
+            lines.append("【ボロノイ分割後】")
+        else:
+            lines.append("【GAT最適化実行後】")
         init_metrics = load_step_routes(0)
         for i, c in enumerate(curr_company, 1):
             base = init_metrics["company"][i-1] if init_metrics else None
@@ -143,7 +148,7 @@ def plot_routes(customers, routes, depot_id_list, vehicle_num_list, iteration, i
         base_total = init_metrics["total"] if init_metrics else None
         lines.append(f"  TOTAL: {fmt(curr_total)}   改善(初期比): {pct(base_total, curr_total)}")
     else:
-        if iteration%2 == 0:
+        if iteration%2 == 1:
             plt.title(f"【ボロノイ境界付近のPD移管 {int(iteration/2)+1}組目】")
         else:
             plt.title(f"【GAT最適化実行後】")

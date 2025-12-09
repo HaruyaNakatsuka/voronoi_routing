@@ -1,6 +1,6 @@
 from typing import Dict, List, Tuple
 import math
-from flexible_vrp_solver import solve_vrp_flexible
+from ortools_vrp_solver import solve_vrp_flexible
 
 def perform_voronoi_routing_onlyMovedPD(
     routes: List[List[int]],

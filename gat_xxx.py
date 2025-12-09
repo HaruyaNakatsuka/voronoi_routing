@@ -1,4 +1,4 @@
-from flexible_vrp_solver import solve_vrp_flexible, route_cost
+from ortools_vrp_solver import solve_vrp_flexible, route_cost
 from ortools.sat.python import cp_model
 
 

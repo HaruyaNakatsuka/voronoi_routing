@@ -1,6 +1,6 @@
 from parser import parse_lilim200, customers_to_lilim200_text
-from flexible_vrp_solver import solve_vrp_flexible, route_cost
-from gat import initialize_individual_vrps, perform_gat_exchange
+from ortools_vrp_solver import solve_vrp_flexible, route_cost
+from gat import initialize_individual_vrps, optimize_intra_company_by_ortools_2vehicle_gat, optimize_intra_company_by_exact_2vehicle_gat
 from visualizer import plot_routes
 from web_exporter import export_vrp_state, generate_index_json
 from voronoi_allocator import perform_voronoi_routing_onlyMovedPD
@@ -234,6 +234,7 @@ for case_index, (file_paths, offsets) in enumerate(test_cases, 1):
         vehicle_num_list,
         vehicle_capacity
     )
+     
     current_company_costs = compute_company_costs(routes, all_customers, vehicle_num_list)
     current_total_cost = sum(current_company_costs)
     cost_reduction_rates = [((init_c - cur_c) / init_c * 100.0) for init_c, cur_c 
@@ -271,22 +272,118 @@ for case_index, (file_paths, offsets) in enumerate(test_cases, 1):
                      instance_name=instance_name, output_root="web_data")
     if ENABLE_PLOT:
         plot_routes(all_customers, routes, depot_id_list, vehicle_num_list, iteration=1, instance_name=instance_name)
+    
+    # =======================================================
+    # 　　           GAT（社内最適化）を実行
+    # =======================================================
+    print(">>> 社内GATによる最適化")
+    per_company_routes = split_routes_by_company(routes, vehicle_num_list)
+    new_per_company_routes = []
+    
+    previous_cost_reduction_rates = cost_reduction_rates[:]
+    prev_company_costs = current_company_costs
+    prev_total_cost = current_total_cost
+    
+    for comp_idx, company_routes in enumerate(per_company_routes):
+        # 会社内ノード集合・顧客・PD を構築
+        company_customers = filter_subcustomers_by_routes(all_customers, company_routes)
+        company_node_ids = set(c["id"] for c in company_customers)
+        company_PD_pairs_dict = filter_pd_pairs_for_nodes(all_PD_pairs, company_node_ids)
 
+        # --- 社内GATを実行（1社ぶん） ---
+        # original_routes は「単一会社の全車両routes（デポ込み）」を渡す想定
+        updated_company_routes = optimize_intra_company_by_exact_2vehicle_gat(
+            company_routes,
+            company_customers,
+            company_PD_pairs_dict,
+            vehicle_capacity
+        )
+
+        # 失敗時の保険（GATが None を返す等）
+        if updated_company_routes is None:
+            updated_company_routes = company_routes
+
+        new_per_company_routes.append(updated_company_routes)
+
+        # 全社ぶんを反映
+    routes = list(chain.from_iterable(new_per_company_routes))
+
+    # 改善率の更新
+    current_company_costs = compute_company_costs(routes, all_customers, vehicle_num_list)
+    current_total_cost = sum(current_company_costs)
+    cost_reduction_rates = [((init - cur) / init * 100.0) if init > 0 else 0.0 
+                            for init, cur in zip(initial_company_costs, current_company_costs)]
+    total_cost_reduction_rates = ((initial_total_cost - current_total_cost) / initial_total_cost * 100.0)
+
+    #　[コンソール出力] -> 改善率、他
+    colw = 10
+    # ヘッダー行
+    print(
+        " " * 7 +
+        "{:>{w}} {:>{w}} {:>{w}} {:>{w}}".format(
+            "初期コスト", "暫定コスト", "ラウンド改善(%)", "初期比改善(%)", w=colw
+        )
+    )
+    # 各社の行
+    colw = 15
+    for idx, (init_c, prev_c, cur_c, init_improve) in enumerate(zip(initial_company_costs, prev_company_costs, current_company_costs, cost_reduction_rates), 1):
+        round_improve = ((prev_c - cur_c) / prev_c * 100.0) if prev_c > 0 else 0.0
+        print(
+            f"LSP {idx:<2} " +
+            "{:>{w}.2f} {:>{w}.2f} {:>{w}.2f} {:>{w}.2f}".format(
+                init_c, cur_c, round_improve, init_improve, w=colw
+            )
+        )
+    # TOTAL行
+    round_improve_total = ((prev_total_cost - current_total_cost) / prev_total_cost * 100.0) if prev_total_cost > 0 else 0.0
+    print(
+        f"{'TOTAL':<6} " +
+        "{:>{w}.2f} {:>{w}.2f} {:>{w}.2f} {:>{w}.2f}".format(
+            initial_total_cost, current_total_cost, round_improve_total, total_cost_reduction_rates, w=colw
+        )
+    )
+    # [データ保存] -> jsonファイル、pngファイル
+    if ENABLE_EXPORT:
+        export_vrp_state(all_customers, routes, all_PD_pairs, 2, case_index=case_index,
+                        depot_id_list=depot_id_list, vehicle_num_list=vehicle_num_list,instance_name=instance_name, output_root="web_data")
+    if ENABLE_PLOT:
+        plot_routes(all_customers, routes, depot_id_list, vehicle_num_list, iteration=2, instance_name=instance_name)
+    
 
     # =======================================================
     # =============== 段階的なタスク再交換　===============
     # =======================================================
     id2cust = {c["id"]: c for c in all_customers}
 
-    print("\n=== 等距離線付近のタスク交換による改善率平均化（solver無し） ===")
+    print("\n=== ボロノイ境界付近のPD移管による改善率平均化 ===")
 
     # --- 会社α/βを確定（α: 改善=正, β: 悪化=負） ---
-    alpha_companies = [i for i, r in enumerate(cost_reduction_rates) if r > 0]
+    alpha_companies = [i for i, r in enumerate(cost_reduction_rates) if r >= 0]
     beta_companies  = [i for i, r in enumerate(cost_reduction_rates) if r < 0]
 
-    # 2社想定（1つずつに定まる前提）
-    assert len(alpha_companies) == 1 and len(beta_companies) == 1, \
-        f"本仕様は α(改善) と β(悪化) が各1社ずつの前提です: alpha={alpha_companies}, beta={beta_companies}"
+    # --- α/β の状況で分岐 ---
+    if len(alpha_companies) == 2 and len(beta_companies) == 0:
+        print(">>> 2社ともα（両社とも経路長が短縮）: 経路改善を終了")
+        #  [データ保存] -> jsonファイル
+        if ENABLE_EXPORT:
+            generate_index_json(instance_name=instance_name, output_root="web_data", target_root="vrp-viewer/public/vrp_data")
+        # 実行時間
+        elapsed = time.time() - start_time
+        print(f">>> テストケース {case_index} の実行時間: {elapsed:.2f} 秒")
+        continue
+    elif len(beta_companies) == 2 and len(alpha_companies) == 0:
+        print(">>> 2社ともβ（両社とも経路長が増加）: 経路改善を終了")
+         #  [データ保存] -> jsonファイル
+        if ENABLE_EXPORT:
+            generate_index_json(instance_name=instance_name, output_root="web_data", target_root="vrp-viewer/public/vrp_data")
+        # 実行時間
+        elapsed = time.time() - start_time
+        print(f">>> テストケース {case_index} の実行時間: {elapsed:.2f} 秒")
+        continue
+    else:
+        # 2社想定なので、ここで一意に定まる
+        alpha_idx = alpha_companies[0]
+        beta_idx = beta_companies[0]
 
     alpha_idx = alpha_companies[0]  # 移管先
     beta_idx  = beta_companies[0]   # 移管元
@@ -307,7 +404,7 @@ for case_index, (file_paths, offsets) in enumerate(test_cases, 1):
 
     previous_cost_reduction_rates = None
     iteration = 0
-    step_idx = 2
+    step_idx = 3
     while True:
         # --- 終了条件チェック ---
         all_positive = all(rate > 0 for rate in cost_reduction_rates)
@@ -434,6 +531,7 @@ for case_index, (file_paths, offsets) in enumerate(test_cases, 1):
         # =======================================================
         # 　　同一 while ループ内で GAT（社内最適化）を実行
         # =======================================================
+        print(">>> 社内GATによる最適化")
         per_company_routes = split_routes_by_company(routes, vehicle_num_list)
         new_per_company_routes = []
         
@@ -443,16 +541,16 @@ for case_index, (file_paths, offsets) in enumerate(test_cases, 1):
 
         for comp_idx, company_routes in enumerate(per_company_routes):
             # 会社内ノード集合・顧客・PD を構築
-            sub_customers = filter_subcustomers_by_routes(all_customers, company_routes)
-            sub_node_ids = set(c["id"] for c in sub_customers)
-            sub_PD_pairs_dict = filter_pd_pairs_for_nodes(all_PD_pairs, sub_node_ids)
+            company_customers = filter_subcustomers_by_routes(all_customers, company_routes)
+            company_node_ids = set(c["id"] for c in company_customers)
+            company_PD_pairs_dict = filter_pd_pairs_for_nodes(all_PD_pairs, company_node_ids)
 
             # --- 社内GATを実行（1社ぶん） ---
             # original_routes は「単一会社の全車両routes（デポ込み）」を渡す想定
-            updated_company_routes = perform_gat_exchange(
+            updated_company_routes = optimize_intra_company_by_exact_2vehicle_gat(
                 company_routes,
-                sub_customers,
-                sub_PD_pairs_dict,
+                company_customers,
+                company_PD_pairs_dict,
                 vehicle_capacity
             )
 
