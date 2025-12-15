@@ -1,6 +1,7 @@
 from parser import parse_lilim200, customers_to_lilim200_text
 from ortools_vrp_solver import solve_vrp_flexible, route_cost
 from gat import initialize_individual_vrps, optimize_intra_company_by_ortools_2vehicle_gat, optimize_intra_company_by_exact_2vehicle_gat
+from exact_pdptw_solver_version1 import debug_run_exact_2vehicle_vrp_on_two_routes
 from visualizer import plot_routes
 from web_exporter import export_vrp_state, generate_index_json
 from voronoi_allocator import perform_voronoi_routing_onlyMovedPD
@@ -138,6 +139,99 @@ def find_company_owning_pd_pair(routes_all, vehicle_num_list, pd_nodes):
     return None
 
 
+def update_costs_and_reduction_rates(
+    routes,
+    all_customers,
+    vehicle_num_list,
+    initial_company_costs,
+    initial_total_cost
+):
+    current_company_costs = compute_company_costs(
+        routes, all_customers, vehicle_num_list
+    )
+    current_total_cost = sum(current_company_costs)
+
+    cost_reduction_rates = [
+        ((init - cur) / init * 100.0) if init > 0 else 0.0
+        for init, cur in zip(initial_company_costs, current_company_costs)
+    ]
+    total_cost_reduction_rates = (
+        (initial_total_cost - current_total_cost)
+        / initial_total_cost * 100.0
+        if initial_total_cost > 0 else 0.0
+    )
+
+    return (
+        current_company_costs,
+        current_total_cost,
+        cost_reduction_rates,
+        total_cost_reduction_rates,
+    )
+
+
+def print_cost_table(
+    initial_company_costs,
+    current_company_costs,
+    initial_total_cost,
+    current_total_cost,
+    cost_reduction_rates,
+    prev_company_costs=None,
+    prev_total_cost=None,
+    title=None
+):
+    if title:
+        print(f"\n{title}")
+
+    colw = 10
+    headers = ["初期コスト", "暫定コスト"]
+    if prev_company_costs is not None:
+        headers.append("ラウンド改善(%)")
+    headers.append("初期比改善(%)")
+
+    print(
+        " " * 7 +
+        "".join(f"{h:>{colw}}" for h in headers)
+    )
+
+    colw = 15
+    for idx, init_c in enumerate(initial_company_costs):
+        cur_c = current_company_costs[idx]
+        values = [init_c, cur_c]
+
+        if prev_company_costs is not None:
+            prev_c = prev_company_costs[idx]
+            round_improve = ((prev_c - cur_c) / prev_c * 100.0) if prev_c > 0 else 0.0
+            values.append(round_improve)
+
+        values.append(cost_reduction_rates[idx])
+
+        print(
+            f"LSP {idx+1:<2} " +
+            "".join(f"{v:>{colw}.2f}" for v in values)
+        )
+
+    total_values = [initial_total_cost, current_total_cost]
+    if prev_total_cost is not None:
+        round_total = (
+            (prev_total_cost - current_total_cost) / prev_total_cost * 100.0
+            if prev_total_cost > 0 else 0.0
+        )
+        total_values.append(round_total)
+
+    total_improve = (
+        (initial_total_cost - current_total_cost)
+        / initial_total_cost * 100.0
+        if initial_total_cost > 0 else 0.0
+    )
+    total_values.append(total_improve)
+
+    print(
+        f"{'TOTAL':<6} " +
+        "".join(f"{v:>{colw}.2f}" for v in total_values)
+    )
+
+
+
 # ==============================
 # === テストケースの定義部 ===
 # ==============================
@@ -154,6 +248,7 @@ test_cases = [
     (["data/LR1_2_10.txt", "data/LR1_2_3.txt"], [(0, 0), (0, -30)]),
     (["data/LR1_2_10.txt", "data/LR1_2_8.txt"], [(0, 0), (0, 30)])
 ]
+
 
 
 # ==============================
@@ -194,6 +289,9 @@ for case_index, (file_paths, offsets) in enumerate(test_cases, 1):
 
         if vehicle_capacity is None:
             vehicle_capacity = data['vehicle_capacity']
+            
+            
+    #debug_run_exact_2vehicle_vrp_on_two_routes(all_customers, all_PD_pairs, vehicle_capacity=200)
 
     # =============================
     # === 初期：LSP個別の経路生成 ===
@@ -234,36 +332,26 @@ for case_index, (file_paths, offsets) in enumerate(test_cases, 1):
         vehicle_num_list,
         vehicle_capacity
     )
-     
-    current_company_costs = compute_company_costs(routes, all_customers, vehicle_num_list)
-    current_total_cost = sum(current_company_costs)
-    cost_reduction_rates = [((init_c - cur_c) / init_c * 100.0) for init_c, cur_c 
-                                    in zip(initial_company_costs, current_company_costs)]
-    total_cost_reduction_rates = ((initial_total_cost - current_total_cost) / initial_total_cost * 100.0)
-
-    #　[コンソール出力] -> 改善率、他
-    colw = 10
-    print(
-        " " * 7 +
-        "{:>{w}} {:>{w}} {:>{w}}".format(
-            "初期コスト", "暫定コスト", "初期比改善(%)", w=colw
-        )
+    # 改善率の更新
+    (   
+        current_company_costs,
+        current_total_cost,
+        cost_reduction_rates,
+        total_cost_reduction_rates,
+    ) = update_costs_and_reduction_rates(
+        routes,
+        all_customers,
+        vehicle_num_list,
+        initial_company_costs,
+        initial_total_cost,
     )
-    colw = 15
-    for idx, (init_c, cur_c, init_improve) in enumerate(
-        zip(initial_company_costs, current_company_costs, cost_reduction_rates), 1
-    ):
-        print(
-            f"LSP {idx:<2} " +
-            "{:>{w}.2f} {:>{w}.2f} {:>{w}.2f}".format(
-                init_c, cur_c, init_improve, w=colw
-            )
-        )
-    print(
-        f"{'TOTAL':<6} " +
-        "{:>{w}.2f} {:>{w}.2f} {:>{w}.2f}".format(
-            initial_total_cost, current_total_cost, total_cost_reduction_rates, w=colw
-        )
+    #　[コンソール出力] -> 改善率、他
+    print_cost_table(
+        initial_company_costs,
+        current_company_costs,
+        initial_total_cost,
+        current_total_cost,
+        cost_reduction_rates,
     )
     # [データ保存] -> jsonファイル、pngファイル
     if ENABLE_EXPORT:
@@ -277,6 +365,8 @@ for case_index, (file_paths, offsets) in enumerate(test_cases, 1):
     # 　　           GAT（社内最適化）を実行
     # =======================================================
     print(">>> 社内GATによる最適化")
+    gat_start_time = time.time()
+    
     per_company_routes = split_routes_by_company(routes, vehicle_num_list)
     new_per_company_routes = []
     
@@ -309,45 +399,36 @@ for case_index, (file_paths, offsets) in enumerate(test_cases, 1):
     routes = list(chain.from_iterable(new_per_company_routes))
 
     # 改善率の更新
-    current_company_costs = compute_company_costs(routes, all_customers, vehicle_num_list)
-    current_total_cost = sum(current_company_costs)
-    cost_reduction_rates = [((init - cur) / init * 100.0) if init > 0 else 0.0 
-                            for init, cur in zip(initial_company_costs, current_company_costs)]
-    total_cost_reduction_rates = ((initial_total_cost - current_total_cost) / initial_total_cost * 100.0)
-
-    #　[コンソール出力] -> 改善率、他
-    colw = 10
-    # ヘッダー行
-    print(
-        " " * 7 +
-        "{:>{w}} {:>{w}} {:>{w}} {:>{w}}".format(
-            "初期コスト", "暫定コスト", "ラウンド改善(%)", "初期比改善(%)", w=colw
-        )
+    (
+        current_company_costs,
+        current_total_cost,
+        cost_reduction_rates,
+        total_cost_reduction_rates,
+    ) = update_costs_and_reduction_rates(
+        routes,
+        all_customers,
+        vehicle_num_list,
+        initial_company_costs,
+        initial_total_cost,
     )
-    # 各社の行
-    colw = 15
-    for idx, (init_c, prev_c, cur_c, init_improve) in enumerate(zip(initial_company_costs, prev_company_costs, current_company_costs, cost_reduction_rates), 1):
-        round_improve = ((prev_c - cur_c) / prev_c * 100.0) if prev_c > 0 else 0.0
-        print(
-            f"LSP {idx:<2} " +
-            "{:>{w}.2f} {:>{w}.2f} {:>{w}.2f} {:>{w}.2f}".format(
-                init_c, cur_c, round_improve, init_improve, w=colw
-            )
-        )
-    # TOTAL行
-    round_improve_total = ((prev_total_cost - current_total_cost) / prev_total_cost * 100.0) if prev_total_cost > 0 else 0.0
-    print(
-        f"{'TOTAL':<6} " +
-        "{:>{w}.2f} {:>{w}.2f} {:>{w}.2f} {:>{w}.2f}".format(
-            initial_total_cost, current_total_cost, round_improve_total, total_cost_reduction_rates, w=colw
-        )
+    #　[コンソール出力] -> 改善率、他
+    gat_end_time = time.time()
+    gat_runtime = gat_end_time - gat_start_time
+    print_cost_table(
+        initial_company_costs,
+        current_company_costs,
+        initial_total_cost,
+        current_total_cost,
+        cost_reduction_rates,
+        prev_company_costs=prev_company_costs,
+        prev_total_cost=prev_total_cost,
     )
     # [データ保存] -> jsonファイル、pngファイル
     if ENABLE_EXPORT:
         export_vrp_state(all_customers, routes, all_PD_pairs, 2, case_index=case_index,
                         depot_id_list=depot_id_list, vehicle_num_list=vehicle_num_list,instance_name=instance_name, output_root="web_data")
     if ENABLE_PLOT:
-        plot_routes(all_customers, routes, depot_id_list, vehicle_num_list, iteration=2, instance_name=instance_name)
+        plot_routes(all_customers, routes, depot_id_list, vehicle_num_list, iteration=2, instance_name=instance_name, elapsed_time=gat_runtime,)
     
 
     # =======================================================
@@ -407,6 +488,8 @@ for case_index, (file_paths, offsets) in enumerate(test_cases, 1):
     step_idx = 3
     while True:
         # --- 終了条件チェック ---
+        #「αとβが逆転したら終了」も追加
+
         all_positive = all(rate > 0 for rate in cost_reduction_rates)
         all_negative = all(rate < 0 for rate in cost_reduction_rates)
         flipped_positive_to_negative = (
@@ -484,38 +567,27 @@ for case_index, (file_paths, offsets) in enumerate(test_cases, 1):
         routes = list(chain.from_iterable(per_company_routes))
 
         # 改善率の更新
-        current_company_costs = compute_company_costs(routes, all_customers, vehicle_num_list)
-        current_total_cost = sum(current_company_costs)
-        cost_reduction_rates = [((init - cur) / init * 100.0) if init > 0 else 0.0 
-                                for init, cur in zip(initial_company_costs, current_company_costs)]
-        total_cost_reduction_rates = ((initial_total_cost - current_total_cost) / initial_total_cost * 100.0)
-        
-        #　[コンソール出力] -> 改善率、他
-        colw = 10
-        # ヘッダー行
-        print(
-            " " * 7 +
-            "{:>{w}} {:>{w}} {:>{w}} {:>{w}}".format(
-                "初期コスト", "暫定コスト", "ラウンド改善(%)", "初期比改善(%)", w=colw
-            )
+        (
+            current_company_costs,
+            current_total_cost,
+            cost_reduction_rates,
+            total_cost_reduction_rates,
+        ) = update_costs_and_reduction_rates(
+            routes,
+            all_customers,
+            vehicle_num_list,
+            initial_company_costs,
+            initial_total_cost,
         )
-        # 各社の行
-        colw = 15
-        for idx, (init_c, prev_c, cur_c, init_improve) in enumerate(zip(initial_company_costs, prev_company_costs, current_company_costs, cost_reduction_rates), 1):
-            round_improve = ((prev_c - cur_c) / prev_c * 100.0) if prev_c > 0 else 0.0
-            print(
-                f"LSP {idx:<2} " +
-                "{:>{w}.2f} {:>{w}.2f} {:>{w}.2f} {:>{w}.2f}".format(
-                    init_c, cur_c, round_improve, init_improve, w=colw
-                )
-            )
-        # TOTAL行
-        round_improve_total = ((prev_total_cost - current_total_cost) / prev_total_cost * 100.0) if prev_total_cost > 0 else 0.0
-        print(
-            f"{'TOTAL':<6} " +
-            "{:>{w}.2f} {:>{w}.2f} {:>{w}.2f} {:>{w}.2f}".format(
-                initial_total_cost, current_total_cost, round_improve_total, total_cost_reduction_rates, w=colw
-            )
+        #　[コンソール出力] -> 改善率、他
+        print_cost_table(
+            initial_company_costs,
+            current_company_costs,
+            initial_total_cost,
+            current_total_cost,
+            cost_reduction_rates,
+            prev_company_costs=prev_company_costs,
+            prev_total_cost=prev_total_cost,
         )
         
         # [データ保存] -> jsonファイル、pngファイル
@@ -532,6 +604,8 @@ for case_index, (file_paths, offsets) in enumerate(test_cases, 1):
         # 　　同一 while ループ内で GAT（社内最適化）を実行
         # =======================================================
         print(">>> 社内GATによる最適化")
+        gat_start_time = time.time()
+        
         per_company_routes = split_routes_by_company(routes, vehicle_num_list)
         new_per_company_routes = []
         
@@ -564,45 +638,36 @@ for case_index, (file_paths, offsets) in enumerate(test_cases, 1):
         routes = list(chain.from_iterable(new_per_company_routes))
 
         # 改善率の更新
-        current_company_costs = compute_company_costs(routes, all_customers, vehicle_num_list)
-        current_total_cost = sum(current_company_costs)
-        cost_reduction_rates = [((init - cur) / init * 100.0) if init > 0 else 0.0 
-                                for init, cur in zip(initial_company_costs, current_company_costs)]
-        total_cost_reduction_rates = ((initial_total_cost - current_total_cost) / initial_total_cost * 100.0)
-
-         #　[コンソール出力] -> 改善率、他
-        colw = 10
-        # ヘッダー行
-        print(
-            " " * 7 +
-            "{:>{w}} {:>{w}} {:>{w}} {:>{w}}".format(
-                "初期コスト", "暫定コスト", "ラウンド改善(%)", "初期比改善(%)", w=colw
-            )
+        (
+            current_company_costs,
+            current_total_cost,
+            cost_reduction_rates,
+            total_cost_reduction_rates,
+        ) = update_costs_and_reduction_rates(
+            routes,
+            all_customers,
+            vehicle_num_list,
+            initial_company_costs,
+            initial_total_cost,
         )
-        # 各社の行
-        colw = 15
-        for idx, (init_c, prev_c, cur_c, init_improve) in enumerate(zip(initial_company_costs, prev_company_costs, current_company_costs, cost_reduction_rates), 1):
-            round_improve = ((prev_c - cur_c) / prev_c * 100.0) if prev_c > 0 else 0.0
-            print(
-                f"LSP {idx:<2} " +
-                "{:>{w}.2f} {:>{w}.2f} {:>{w}.2f} {:>{w}.2f}".format(
-                    init_c, cur_c, round_improve, init_improve, w=colw
-                )
-            )
-        # TOTAL行
-        round_improve_total = ((prev_total_cost - current_total_cost) / prev_total_cost * 100.0) if prev_total_cost > 0 else 0.0
-        print(
-            f"{'TOTAL':<6} " +
-            "{:>{w}.2f} {:>{w}.2f} {:>{w}.2f} {:>{w}.2f}".format(
-                initial_total_cost, current_total_cost, round_improve_total, total_cost_reduction_rates, w=colw
-            )
+        #　[コンソール出力] -> 改善率、他
+        gat_end_time = time.time()
+        gat_runtime = gat_end_time - gat_start_time
+        print_cost_table(
+            initial_company_costs,
+            current_company_costs,
+            initial_total_cost,
+            current_total_cost,
+            cost_reduction_rates,
+            prev_company_costs=prev_company_costs,
+            prev_total_cost=prev_total_cost,
         )
         # [データ保存] -> jsonファイル、pngファイル
         if ENABLE_EXPORT:
             export_vrp_state(all_customers, routes, all_PD_pairs, step_idx, case_index=case_index,
                             depot_id_list=depot_id_list, vehicle_num_list=vehicle_num_list,instance_name=instance_name, output_root="web_data")
         if ENABLE_PLOT:
-            plot_routes(all_customers, routes, depot_id_list, vehicle_num_list,iteration=step_idx, instance_name=instance_name)
+            plot_routes(all_customers, routes, depot_id_list, vehicle_num_list,iteration=step_idx, instance_name=instance_name, elapsed_time=gat_runtime,)
 
         step_idx += 1
         iteration += 1

@@ -140,7 +140,7 @@ def perform_voronoi_routing_onlyMovedPD(
             (p, d) for (p, d) in moved_pairs if after_company_of[(p, d)] == comp_idx
         ]
 
-        # まず固定ルートを入れる
+        # 固定ルートは確定（ソルバーに渡さない）
         preserved = fixed_routes_per_company[comp_idx]
         # 念のため台数オーバー防止
         if len(preserved) > total_veh:
