@@ -76,9 +76,9 @@ def optimize_intra_company_by_ortools_2vehicle_gat(original_routes, customers, P
     # 全ての 2車両ペア (i, j) に対し、2車両VRPで最適化した候補を収集
     for i in range(num_vehicles):
         for j in range(i + 1, num_vehicles):
-            print(f"\n>車両{i}と車両{j}の2GAT検証開始")
-            print(f"車両{i}のルート = {original_routes[i]}")
-            print(f"車両{j}のルート = {original_routes[j]}")
+            #print(f"\n>車両{i}と車両{j}の2GAT検証開始")
+            #print(f"車両{i}のルート = {original_routes[i]}")
+            #print(f"車両{j}のルート = {original_routes[j]}")
             
              # 対象ノード集合（両ルートの訪問ノード + 各自デポ）
             combined_node_ids = set(original_routes[i]) | set(original_routes[j])
@@ -210,9 +210,9 @@ def optimize_intra_company_by_exact_2vehicle_gat(original_routes, customers, PD_
     # 全ての 2車両ペア (i, j) に対し、2車両VRPで最適化した候補を収集
     for i in range(num_vehicles):
         for j in range(i + 1, num_vehicles):
-            print(f"\n>車両{i}と車両{j}の2GAT検証開始")
-            print(f"車両{i}のルート = {original_routes[i]}")
-            print(f"車両{j}のルート = {original_routes[j]}")
+            #print(f"\n>車両{i}と車両{j}の2GAT検証開始")
+            #print(f"車両{i}のルート = {original_routes[i]}")
+            #print(f"車両{j}のルート = {original_routes[j]}")
             # 対象ノード集合（両ルートの訪問ノード + 各自デポ）
             combined_node_ids = set(original_routes[i]) | set(original_routes[j])
 

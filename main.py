@@ -230,12 +230,26 @@ def print_cost_table(
         "".join(f"{v:>{colw}.2f}" for v in total_values)
     )
 
+def count_tasks_per_company(routes, vehicle_num_list):
+    task_counts = []
+    idx = 0  # routes の走査位置
+
+    for vnum in vehicle_num_list:
+        count = 0
+        for _ in range(vnum):
+            route = routes[idx]
+            # デポ（先頭・末尾）を除いたノード数
+            count += max(0, len(route) - 2)
+            idx += 1
+        task_counts.append(count)
+
+    return task_counts
 
 
 # ==============================
 # === テストケースの定義部 ===
 # ==============================
-
+"""
 test_cases = [
     (["data/LC1_2_2.txt", "data/LC1_2_6.txt"], [(0, 0), (42, -42)]),
     (["data/LC1_2_2.txt", "data/LC1_2_7.txt"], [(0, 0), (-32, -32)]),
@@ -248,7 +262,14 @@ test_cases = [
     (["data/LR1_2_10.txt", "data/LR1_2_3.txt"], [(0, 0), (0, -30)]),
     (["data/LR1_2_10.txt", "data/LR1_2_8.txt"], [(0, 0), (0, 30)])
 ]
-
+"""
+test_cases = [
+    (["data/LR1_2_3.txt", "data/LR1_2_8.txt"], [(0, 0), (0, 30)]),
+    (["data/LR1_2_5.txt", "data/LR1_2_8.txt"], [(0, 0), (0, 30)]),
+    (["data/LR1_2_8.txt", "data/LR1_2_9.txt"], [(0, 0), (0, -30)]),
+    (["data/LR1_2_10.txt", "data/LR1_2_3.txt"], [(0, 0), (0, -30)]),
+    (["data/LR1_2_10.txt", "data/LR1_2_8.txt"], [(0, 0), (0, 30)])
+]
 
 
 # ==============================
@@ -304,6 +325,7 @@ for case_index, (file_paths, offsets) in enumerate(test_cases, 1):
         depot_id_list,
         vehicle_capacity
     )
+    print(f"初期状態のタスク個数：{count_tasks_per_company(routes, vehicle_num_list)}")
     
     #　[コンソール出力] -> 会社別コスト
     initial_company_costs = compute_company_costs(routes, all_customers, vehicle_num_list)
@@ -332,6 +354,7 @@ for case_index, (file_paths, offsets) in enumerate(test_cases, 1):
         vehicle_num_list,
         vehicle_capacity
     )
+    print(f"ボロノイ分割後の状態のタスク個数：{count_tasks_per_company(routes, vehicle_num_list)}")
     # 改善率の更新
     (   
         current_company_costs,
@@ -382,7 +405,7 @@ for case_index, (file_paths, offsets) in enumerate(test_cases, 1):
 
         # --- 社内GATを実行（1社ぶん） ---
         # original_routes は「単一会社の全車両routes（デポ込み）」を渡す想定
-        updated_company_routes = optimize_intra_company_by_exact_2vehicle_gat(
+        updated_company_routes = optimize_intra_company_by_ortools_2vehicle_gat(
             company_routes,
             company_customers,
             company_PD_pairs_dict,
@@ -621,7 +644,7 @@ for case_index, (file_paths, offsets) in enumerate(test_cases, 1):
 
             # --- 社内GATを実行（1社ぶん） ---
             # original_routes は「単一会社の全車両routes（デポ込み）」を渡す想定
-            updated_company_routes = optimize_intra_company_by_exact_2vehicle_gat(
+            updated_company_routes = optimize_intra_company_by_ortools_2vehicle_gat (
                 company_routes,
                 company_customers,
                 company_PD_pairs_dict,
