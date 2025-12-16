@@ -7,6 +7,7 @@ from web_exporter import export_vrp_state, generate_index_json
 from voronoi_allocator import perform_voronoi_routing_onlyMovedPD
 import time
 import os
+import math
 from itertools import chain
 import logging
 
@@ -23,7 +24,8 @@ def setup_logging(show_progress: bool = True):
         format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
         force=True,  # ← これがポイント
     )
-    
+
+
 if __name__ == "__main__":
     setup_logging(show_progress=False)  # Falseにするとprint類がすべて非表示に
 
@@ -40,7 +42,6 @@ def compute_company_costs(routes, all_customers, vehicle_num_list):
         costs.append(s)
     return costs
 
-import math
 
 def rank_pd_pairs_by_midpoint_to_voronoi_boundary(all_customers, PD_pairs, depot_id_list):
     """
@@ -229,6 +230,7 @@ def print_cost_table(
         f"{'TOTAL':<6} " +
         "".join(f"{v:>{colw}.2f}" for v in total_values)
     )
+
 
 def count_tasks_per_company(routes, vehicle_num_list):
     task_counts = []
